@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Search, Plus, Minus, Check, ShoppingCart } from 'lucide-react'
-import { playDing } from '../utils/sound'
 import DraftRequestDrawer from './DraftRequestDrawer'
 
 interface DiscoveryPart {
@@ -91,7 +90,6 @@ export default function PartsDiscovery() {
             // Dispatch update event to sync lists instantly
             window.dispatchEvent(new CustomEvent('minion_draft_update', { detail: { sender: 'discovery' } }))
             
-            playDing()
             showToast(`Added ${qty}x ${part.partNumber} to request draft!`)
             setSelectedPart(null)
         } catch (e) {

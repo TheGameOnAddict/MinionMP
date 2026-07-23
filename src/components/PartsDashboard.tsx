@@ -36,6 +36,10 @@ export default function PartsDashboard() {
         setTimeout(() => setToast(null), 3000)
     }
 
+    // Tracking refs for sound alert on new orders
+    const isFirstFetchRef = useRef(true)
+    const knownOrderIdsRef = useRef<Set<string>>(new Set())
+
     const fetchRequests = async () => {
         setLoading(true)
         try {
@@ -51,6 +55,18 @@ export default function PartsDashboard() {
                 items: req.items,
                 status: computeOrderStatus(req.items, req.status)
             }))
+
+            // Play ding ONLY if a new order populates on the dashboard after initial load
+            if (!isFirstFetchRef.current) {
+                const hasNewOrder = formatted.some(r => !knownOrderIdsRef.current.has(r.id))
+                if (hasNewOrder) {
+                    playDing()
+                }
+            } else {
+                isFirstFetchRef.current = false
+            }
+
+            knownOrderIdsRef.current = new Set(formatted.map(r => r.id))
             setRequests(formatted)
         } catch (e) {
             console.error(e)
@@ -230,7 +246,6 @@ export default function PartsDashboard() {
         })
 
         if (success) {
-            playDing()
             fetchRequests()
             showToast(`All items marked as ${newStatus}`)
         }
@@ -323,7 +338,6 @@ export default function PartsDashboard() {
         })
 
         if (success) {
-            playDing()
             fetchRequests()
             showToast('All Picked items Fulfilled')
         }

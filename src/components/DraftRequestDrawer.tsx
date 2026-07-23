@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import {
     X, Trash2, Send, Plus, Minus, Clipboard, Info, ShoppingCart, Pin
 } from 'lucide-react'
-import { playDing } from '../utils/sound'
 import { parseIPC, ParsedItem } from '../utils/parser'
 import { db, RequestLineItem } from '../utils/db'
 
@@ -305,7 +304,6 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
         })
 
         if (result.success) {
-            playDing()
             showToast(`Request submitted! ID: #${id.slice(-5)}`, 'success')
             handleClearDraft()
             setDiscrepancy('')
