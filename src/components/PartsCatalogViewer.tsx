@@ -1301,13 +1301,19 @@ export default function PartsCatalogViewer() {
                 const context = canvas.getContext('2d')
                 if (!context) return
 
-                canvas.width = viewport.width
-                canvas.height = viewport.height
+                // HiDPI / Retina scale factor (min 2x for sharp print & screen displays)
+                const dpr = Math.max(2, window.devicePixelRatio || 1)
+                canvas.width = Math.floor(viewport.width * dpr)
+                canvas.height = Math.floor(viewport.height * dpr)
+                canvas.style.width = `${viewport.width}px`
+                canvas.style.height = `${viewport.height}px`
+
                 setDimensions({ width: viewport.width, height: viewport.height })
 
                 const renderContext = {
                     canvasContext: context,
-                    viewport: viewport
+                    viewport: viewport,
+                    transform: [dpr, 0, 0, dpr, 0, 0]
                 }
                 await page.render(renderContext).promise
 
@@ -1924,15 +1930,33 @@ export default function PartsCatalogViewer() {
             return item.rects
         }
         
+        // Clean keys for robust matching
+        const cleanSelections: { raw: string; clean: string; checked: boolean }[] = Object.entries(pageSelections).map(([partNo, checked]) => ({
+            raw: partNo,
+            clean: partNo.replace(/[^A-Za-z0-9]/g, '').toLowerCase(),
+            checked
+        }))
+
         const filteredRects: { x: number; y: number; w: number; h: number }[] = []
         let currentPartChecked = true
+
         item.lines.forEach(l => {
-            const matchingPart = Object.keys(pageSelections).find(partNo => 
-                l.text.includes(partNo)
-            )
-            if (matchingPart !== undefined) {
-                currentPartChecked = pageSelections[matchingPart]
+            const cleanLineText = l.text.replace(/[^A-Za-z0-9]/g, '').toLowerCase()
+
+            // Check if this line contains one of the tracked part numbers
+            const matched = cleanSelections.find(sel => sel.clean.length >= 3 && cleanLineText.includes(sel.clean))
+
+            if (matched) {
+                currentPartChecked = matched.checked
+            } else {
+                // If this line starts a new part number row or index item, reset currentPartChecked to true
+                // so it doesn't stay false from a previous unchecked part!
+                const hasNewPartNum = /[A-Za-z0-9]+-[A-Za-z0-9-]+/.test(l.text) || /^\s*-?\d{1,4}[A-Za-z]?\b/.test(l.text)
+                if (hasNewPartNum) {
+                    currentPartChecked = true
+                }
             }
+
             if (currentPartChecked) {
                 filteredRects.push(...l.rects)
             }
