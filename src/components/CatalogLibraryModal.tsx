@@ -91,10 +91,16 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
 
     return (
         <div
+            draggable={true}
+            onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', catalog.id)
+                e.dataTransfer.effectAllowed = 'move'
+            }}
             onClick={onSelect}
-            className={`group relative bg-gray-850/80 hover:bg-gray-800 border-2 rounded-2xl p-4 flex flex-col items-center transition-all duration-300 hover:scale-[1.02] shadow-xl hover:shadow-2xl hover:shadow-minion-500/10 cursor-pointer overflow-hidden ${
+            className={`group relative bg-gray-850/80 hover:bg-gray-800 border-2 rounded-2xl p-4 flex flex-col items-center transition-all duration-300 hover:scale-[1.02] shadow-xl hover:shadow-2xl hover:shadow-minion-500/10 cursor-grab active:cursor-grabbing overflow-hidden ${
                 isActive ? 'border-minion-500 ring-2 ring-minion-500/30' : 'border-gray-800 hover:border-gray-700'
             }`}
+            title="Click to open or Drag card onto a Folder tab above to move!"
         >
             {/* Hidden Input for Updating Catalog File */}
             <input
@@ -153,7 +159,7 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
             )}
 
             {/* E-book Cover Frame */}
-            <div className="w-full h-44 bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center relative shadow-inner mb-3 border border-gray-800/80">
+            <div className="w-full h-44 bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center relative shadow-inner mb-3 border border-gray-800/80 pointer-events-none">
                 {loading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900/60 z-10">
                         <RefreshCw className="animate-spin text-minion-500" size={20} />
@@ -219,6 +225,7 @@ export default function CatalogLibraryModal({
     const [catalogs, setCatalogs] = useState<CatalogMetadata[]>(getCatalogLibrary())
     const [folders, setFolders] = useState<CatalogFolder[]>([])
     const [selectedFolderId, setSelectedFolderId] = useState<string>('all')
+    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
     const [isAdmin, setIsAdmin] = useState(adminStore.getIsUnlocked())
     const [uploading, setUploading] = useState(false)
     const [newFolderName, setNewFolderName] = useState('')
@@ -364,6 +371,19 @@ export default function CatalogLibraryModal({
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        {isAdmin && (
+                            <button
+                                onClick={async () => {
+                                    const merged = await fetchMergedCatalogLibrary()
+                                    setCatalogs(merged)
+                                    alert('Catalog library cleaned and deduplicated!')
+                                }}
+                                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 border border-amber-500/30 hover:border-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                title="Purge duplicate catalog entries"
+                            >
+                                <RefreshCw size={12} /> Clean Duplicates
+                            </button>
+                        )}
                         {!isAdmin && onRequestAdminUnlock && (
                             <button
                                 onClick={onRequestAdminUnlock}
@@ -381,12 +401,28 @@ export default function CatalogLibraryModal({
                     </div>
                 </div>
 
-                {/* Folder Carousel Bar */}
+                {/* Folder Carousel Bar & Drag Target */}
                 <div className="px-6 py-3 bg-gray-950/40 border-b border-gray-800 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
+                    <div className="text-[10px] text-amber-300/90 font-mono font-bold flex items-center gap-1 mr-1 shrink-0 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">
+                        💡 Drag cards onto tabs to organize!
+                    </div>
+
                     <button
                         onClick={() => setSelectedFolderId('all')}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('all') }}
+                        onDragLeave={() => setDragOverFolderId(null)}
+                        onDrop={async (e) => {
+                            e.preventDefault()
+                            const catId = e.dataTransfer.getData('text/plain')
+                            setDragOverFolderId(null)
+                            if (catId) {
+                                await handleMoveCatalogToFolder(catId, 'folder_general', 'GENERAL & ENGINES')
+                            }
+                        }}
                         className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                            selectedFolderId === 'all'
+                            dragOverFolderId === 'all'
+                                ? 'bg-amber-300 text-black font-black ring-4 ring-amber-400/60 scale-105 shadow-xl'
+                                : selectedFolderId === 'all'
                                 ? 'bg-minion-500 text-black font-black shadow-md'
                                 : 'bg-gray-850 text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-750'
                         }`}
@@ -396,12 +432,33 @@ export default function CatalogLibraryModal({
 
                     {folders.map(folder => {
                         const count = catalogs.filter(c => c.folder_id === folder.id || (c.folder_name && c.folder_name === folder.name) || c.name.toLowerCase().includes(folder.name.toLowerCase())).length
+                        const isHovered = dragOverFolderId === folder.id
+
                         return (
-                            <div key={folder.id} className="flex items-center shrink-0">
+                            <div
+                                key={folder.id}
+                                onDragOver={(e) => {
+                                    e.preventDefault()
+                                    e.dataTransfer.dropEffect = 'move'
+                                    setDragOverFolderId(folder.id)
+                                }}
+                                onDragLeave={() => setDragOverFolderId(null)}
+                                onDrop={async (e) => {
+                                    e.preventDefault()
+                                    const catId = e.dataTransfer.getData('text/plain')
+                                    setDragOverFolderId(null)
+                                    if (catId) {
+                                        await handleMoveCatalogToFolder(catId, folder.id, folder.name)
+                                    }
+                                }}
+                                className="flex items-center shrink-0"
+                            >
                                 <button
                                     onClick={() => setSelectedFolderId(folder.id)}
                                     className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                        selectedFolderId === folder.id
+                                        isHovered
+                                            ? 'bg-amber-300 text-black font-black ring-4 ring-amber-400/60 scale-105 shadow-xl'
+                                            : selectedFolderId === folder.id
                                             ? 'bg-amber-400 text-black font-black shadow-md'
                                             : 'bg-gray-850 text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-750'
                                     }`}

@@ -97,30 +97,43 @@ export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> =>
     const localList = getCatalogLibrary()
     const cloudCatalogs = await db.getCatalogsFromCloud()
 
+    const map = new Map<string, CatalogMetadata>()
+    // Always add DEFAULT_CATALOG first if present
+    map.set(DEFAULT_CATALOG.id, DEFAULT_CATALOG)
+
     if (cloudCatalogs && cloudCatalogs.length > 0) {
-        const cloudMetas: CatalogMetadata[] = cloudCatalogs.map(c => ({
-            id: c.id,
-            name: c.name,
-            filename: c.filename,
-            folder_id: (c as any).folder_id,
-            folder_name: (c as any).folder_name,
-            pdf_url: c.pdf_url,
-            size: c.size,
-            uploadDate: new Date(c.updated_at).toLocaleDateString()
-        }))
-
-        // Merge cloud catalogs with default sample catalog
-        const map = new Map<string, CatalogMetadata>()
-        map.set(DEFAULT_CATALOG.id, DEFAULT_CATALOG)
-        cloudMetas.forEach(c => map.set(c.id, c))
-        localList.forEach(c => { if (!map.has(c.id)) map.set(c.id, c) })
-
-        const merged = Array.from(map.values())
-        localStorage.setItem('minion_catalog_library', JSON.stringify(merged))
-        return merged
+        // Cloud is active: populate with cloud catalogs as source of truth
+        cloudCatalogs.forEach(c => {
+            map.set(c.id, {
+                id: c.id,
+                name: c.name,
+                filename: c.filename,
+                folder_id: (c as any).folder_id,
+                folder_name: (c as any).folder_name,
+                pdf_url: c.pdf_url,
+                size: c.size,
+                uploadDate: new Date(c.updated_at).toLocaleDateString()
+            })
+        })
+    } else {
+        // Local mode
+        localList.forEach(c => map.set(c.id, c))
     }
 
-    return localList
+    // Secondary deduplication pass by normalized catalog name & filename to remove ghost duplicate items
+    const finalItems: CatalogMetadata[] = []
+    const seenNames = new Set<string>()
+
+    for (const item of map.values()) {
+        const normKey = `${(item.name || '').toLowerCase().trim()}::${(item.filename || '').toLowerCase().trim()}`
+        if (!seenNames.has(normKey) || item.id === DEFAULT_CATALOG.id) {
+            seenNames.add(normKey)
+            finalItems.push(item)
+        }
+    }
+
+    localStorage.setItem('minion_catalog_library', JSON.stringify(finalItems))
+    return finalItems
 }
 
 export const addCatalogToLibrary = async (file: File, customName?: string, targetId?: string, folderId?: string, folderName?: string): Promise<CatalogMetadata> => {
