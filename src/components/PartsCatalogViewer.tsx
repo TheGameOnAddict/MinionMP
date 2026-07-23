@@ -1787,6 +1787,8 @@ export default function PartsCatalogViewer() {
         const file = e.target.files?.[0]
         if (file && file.type === 'application/pdf') {
             setPdfLoading(true)
+            setPdfDoc(null)
+            setPdfLoading(true)
             try {
                 const meta = await addCatalogToLibrary(file)
                 localStorage.setItem('minion_current_pdf_name', meta.id)
@@ -1797,7 +1799,7 @@ export default function PartsCatalogViewer() {
                 localStorage.removeItem(`pdf_metadata_v3_${meta.id}`)
 
                 const url = meta.pdf_url ? `${meta.pdf_url}?t=${Date.now()}` : URL.createObjectURL(file)
-                setPdfUrl(url)
+                setPdfUrl(`${url}#t=${Date.now()}`)
                 setPdfName(meta.id)
                 setPageNumber(1)
                 showToast(`Uploaded & Loaded catalog: ${file.name}`)
@@ -1806,6 +1808,7 @@ export default function PartsCatalogViewer() {
                 showToast('Failed to upload PDF catalog', 'error')
             } finally {
                 setPdfLoading(false)
+                e.target.value = ''
             }
         }
     }
@@ -3047,6 +3050,9 @@ export default function PartsCatalogViewer() {
                 onSelectCatalog={async (cat) => {
                     localStorage.setItem('minion_current_pdf_name', cat.id)
                     setPageNumber(1)
+                    setPdfDoc(null) // Flush old PDF document from memory
+                    localStorage.removeItem(`pdf_metadata_v3_${cat.id}`)
+
                     if (cat.pdf_url) {
                         setPdfUrl(`${cat.pdf_url}?t=${Date.now()}`)
                         setPdfName(cat.id)
@@ -3054,7 +3060,7 @@ export default function PartsCatalogViewer() {
                         const blob = await getPdfFromIndexedDb(cat.id)
                         if (blob) {
                             const url = URL.createObjectURL(blob)
-                            setPdfUrl(url)
+                            setPdfUrl(`${url}#t=${Date.now()}`)
                             setPdfName(cat.id)
                         } else {
                             setPdfUrl('sample-catalog.pdf')

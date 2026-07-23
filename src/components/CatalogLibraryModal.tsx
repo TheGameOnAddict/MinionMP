@@ -91,7 +91,10 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                 className="hidden"
                 onChange={(e) => {
                     const file = e.target.files?.[0]
-                    if (file) onUpdatePdf(file)
+                    if (file) {
+                        onUpdatePdf(file)
+                        e.target.value = ''
+                    }
                 }}
             />
 
@@ -233,9 +236,8 @@ export default function CatalogLibraryModal({
                 updatedMeta.pdf_url = `${updatedMeta.pdf_url}?t=${Date.now()}`
             }
             await refreshCatalogs()
-            if (activeCatalogId === catalogId) {
-                onSelectCatalog(updatedMeta)
-            }
+            onSelectCatalog(updatedMeta)
+            onClose()
             alert(`Updated PDF for "${targetCatalog?.name || catalogId}"! All linked notes and drawings have been preserved.`)
         } catch (err) {
             console.error('Failed to update catalog PDF:', err)
