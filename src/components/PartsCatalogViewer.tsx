@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
     ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
     Square, Circle, Edit3, Type, Grid, Trash2,
-    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Library
+    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Library, Printer
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
@@ -1986,6 +1986,15 @@ export default function PartsCatalogViewer() {
                     </button>
 
                     <button
+                        onClick={() => window.print()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-750 hover:border-gray-650 rounded-lg text-xs font-bold text-gray-200 transition-colors cursor-pointer"
+                        title="Print Current Catalog Page with Annotations & Highlights"
+                    >
+                        <Printer size={14} className="text-minion-400" />
+                        <span>Print Page</span>
+                    </button>
+
+                    <button
                         onClick={() => setIsDrawerOpen(true)}
                         className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-750 hover:border-gray-650 rounded-lg text-xs font-bold text-gray-200 transition-colors cursor-pointer"
                     >
@@ -2367,7 +2376,29 @@ export default function PartsCatalogViewer() {
                                 <span className="text-gray-400 text-xs">Loading PDF catalog...</span>
                             </div>
                         ) : (
-                            <div className={`relative border border-gray-800 shadow-2xl bg-white ${tool === 'select' ? 'select-text' : 'select-none'}`}>
+                            <div className={`printable-catalog-page relative border border-gray-800 shadow-2xl bg-white ${tool === 'select' ? 'select-text' : 'select-none'}`}>
+                                <style>{`
+                                    @media print {
+                                        body * { visibility: hidden !important; }
+                                        .printable-catalog-page, .printable-catalog-page * { visibility: visible !important; }
+                                        .printable-catalog-page {
+                                            position: absolute !important;
+                                            left: 0 !important;
+                                            top: 0 !important;
+                                            width: 100% !important;
+                                            margin: 0 !important;
+                                            padding: 0 !important;
+                                            box-shadow: none !important;
+                                            border: none !important;
+                                            -webkit-print-color-adjust: exact !important;
+                                            print-color-adjust: exact !important;
+                                        }
+                                        .printable-catalog-page .absolute.right-full,
+                                        .printable-catalog-page .absolute.left-full {
+                                            display: none !important;
+                                        }
+                                    }
+                                `}</style>
                                                           {/* Page Carousel floating to the left */}
                                 <div 
                                     ref={carouselRef}
