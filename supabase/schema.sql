@@ -2,6 +2,7 @@
 -- MinionMP Supabase Database Initialization & Schema
 -- Run this script in your Supabase SQL Editor:
 -- Dashboard -> SQL Editor -> New Query -> Run
+-- (Safe to run multiple times)
 -- ========================================================
 
 -- 1. Create Parts Requests Table
@@ -75,6 +76,14 @@ ALTER TABLE public.minion_part_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.minion_shop_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.minion_catalogs ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if re-running
+DROP POLICY IF EXISTS "Public anonymous access for minion_requests" ON public.minion_requests;
+DROP POLICY IF EXISTS "Public anonymous access for minion_annotations" ON public.minion_annotations;
+DROP POLICY IF EXISTS "Public anonymous access for minion_inventory" ON public.minion_inventory;
+DROP POLICY IF EXISTS "Public anonymous access for minion_part_images" ON public.minion_part_images;
+DROP POLICY IF EXISTS "Public anonymous access for minion_shop_orders" ON public.minion_shop_orders;
+DROP POLICY IF EXISTS "Public anonymous access for minion_catalogs" ON public.minion_catalogs;
+
 -- Allow anonymous users to SELECT, INSERT, UPDATE, DELETE
 CREATE POLICY "Public anonymous access for minion_requests" ON public.minion_requests
     FOR ALL USING (true) WITH CHECK (true);
@@ -95,14 +104,27 @@ CREATE POLICY "Public anonymous access for minion_catalogs" ON public.minion_cat
     FOR ALL USING (true) WITH CHECK (true);
 
 -- ========================================================
--- Enable Supabase Realtime Replication
+-- Enable Supabase Realtime Replication (Safe to re-run)
 -- ========================================================
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_requests;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_annotations;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_inventory;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_shop_orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_catalogs;
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'minion_requests') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_requests;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'minion_annotations') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_annotations;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'minion_inventory') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_inventory;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'minion_shop_orders') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_shop_orders;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'minion_catalogs') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_catalogs;
+    END IF;
+END $$;
 
 -- ========================================================
 -- Storage Buckets Setup:
