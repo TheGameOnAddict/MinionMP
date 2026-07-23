@@ -168,20 +168,41 @@ class DbService {
 
         if (this.isCloud && this.supabase) {
             try {
-                const { error } = await this.supabase
+                const payload: any = {
+                    id: fullReq.id,
+                    mechanic: fullReq.mechanic,
+                    tail: fullReq.tail,
+                    discrepancy: fullReq.discrepancy,
+                    status: fullReq.status,
+                    items: fullReq.items
+                }
+                if (fullReq.notes) {
+                    payload.notes = fullReq.notes
+                }
+
+                let { error } = await this.supabase
                     .from('minion_requests')
-                    .insert({
-                        id: fullReq.id,
-                        mechanic: fullReq.mechanic,
-                        tail: fullReq.tail,
-                        discrepancy: fullReq.discrepancy,
-                        status: fullReq.status,
-                        items: fullReq.items,
-                        notes: fullReq.notes || ''
-                    })
+                    .insert(payload)
+
+                // Fallback if 'notes' column doesn't exist on live Supabase table yet
+                if (error && payload.notes) {
+                    console.warn('Retrying Supabase insert without notes column:', error)
+                    delete payload.notes
+                    const retry = await this.supabase.from('minion_requests').insert(payload)
+                    error = retry.error
+                }
 
                 if (error) throw error
-                this.triggerLocalUpdate()
+
+                // Local Storage Backup Sync
+                const localData = localStorage.getItem('minion_requests')
+                const list: PartsRequest[] = localData ? JSON.parse(localData) : []
+                if (!list.some(r => r.id === fullReq.id)) {
+                    list.unshift(fullReq)
+                    localStorage.setItem('minion_requests', JSON.stringify(list))
+                }
+
+                this.triggerLocalUpdate('requests')
                 return { success: true, id: fullReq.id }
             } catch (e) {
                 console.error('Supabase saveRequest failed, saving to localStorage fallback:', e)
@@ -190,9 +211,9 @@ class DbService {
 
         // Local Storage
         const requests = await this.getRequests()
-        requests.push(fullReq)
+        requests.unshift(fullReq)
         localStorage.setItem('minion_requests', JSON.stringify(requests))
-        this.triggerLocalUpdate()
+        this.triggerLocalUpdate('requests')
         return { success: true, id: fullReq.id }
     }
 
@@ -205,7 +226,7 @@ class DbService {
                     .eq('id', requestId)
 
                 if (error) throw error
-                this.triggerLocalUpdate()
+                this.triggerLocalUpdate('requests')
                 return true
             } catch (e) {
                 console.error('Supabase updateRequestStatus failed:', e)
@@ -218,7 +239,7 @@ class DbService {
         if (index !== -1) {
             requests[index].status = status
             localStorage.setItem('minion_requests', JSON.stringify(requests))
-            this.triggerLocalUpdate()
+            this.triggerLocalUpdate('requests')
             return true
         }
         return false
@@ -227,20 +248,44 @@ class DbService {
     public async updateRequest(req: PartsRequest): Promise<boolean> {
         if (this.isCloud && this.supabase) {
             try {
-                const { error } = await this.supabase
+                const payload: any = {
+                    mechanic: req.mechanic,
+                    tail: req.tail,
+                    discrepancy: req.discrepancy,
+                    status: req.status,
+                    items: req.items
+                }
+                if (req.notes !== undefined) {
+                    payload.notes = req.notes
+                }
+
+                let { error } = await this.supabase
                     .from('minion_requests')
-                    .update({
-                        mechanic: req.mechanic,
-                        tail: req.tail,
-                        discrepancy: req.discrepancy,
-                        status: req.status,
-                        items: req.items,
-                        notes: req.notes || ''
-                    })
+                    .update(payload)
                     .eq('id', req.id)
 
+                if (error && payload.notes !== undefined) {
+                    delete payload.notes
+                    const retry = await this.supabase.from('minion_requests').update(payload).eq('id', req.id)
+                    error = retry.error
+                }
+
                 if (error) throw error
-                this.triggerLocalUpdate()
+
+                // Local Storage backup
+                const localData = localStorage.getItem('minion_requests')
+                if (localData) {
+                    try {
+                        const requests = JSON.parse(localData) as PartsRequest[]
+                        const idx = requests.findIndex(r => r.id === req.id)
+                        if (idx !== -1) {
+                            requests[idx] = req
+                            localStorage.setItem('minion_requests', JSON.stringify(requests))
+                        }
+                    } catch (e) {}
+                }
+
+                this.triggerLocalUpdate('requests')
                 return true
             } catch (e) {
                 console.error('Supabase updateRequest failed:', e)
@@ -253,7 +298,7 @@ class DbService {
         if (index !== -1) {
             requests[index] = req
             localStorage.setItem('minion_requests', JSON.stringify(requests))
-            this.triggerLocalUpdate()
+            this.triggerLocalUpdate('requests')
             return true
         }
         return false
@@ -353,6 +398,8 @@ class DbService {
     // --- REALTIME SUBSCRIPTIONS ---
 
     public subscribeToRequests(callback: () => void): () => void {
+        const unsubscribers: Array<() => void> = []
+
         if (this.isCloud && this.supabase) {
             const channel = this.supabase
                 .channel('realtime:minion_requests')
@@ -361,21 +408,24 @@ class DbService {
                 })
                 .subscribe()
 
-            // Return unsubscribe cleanup function
-            return () => {
+            unsubscribers.push(() => {
                 this.supabase?.removeChannel(channel)
-            }
+            })
         }
 
-        // Local fallback listener
+        // Local event listener ALWAYS enabled for instant local updates across tabs/components
         const handleLocalChange = (e: Event) => {
             if ((e as CustomEvent).detail?.type === 'requests') {
                 callback()
             }
         }
         window.addEventListener('minion_db_update', handleLocalChange)
-        return () => {
+        unsubscribers.push(() => {
             window.removeEventListener('minion_db_update', handleLocalChange)
+        })
+
+        return () => {
+            unsubscribers.forEach(unsub => unsub())
         }
     }
 
