@@ -519,15 +519,20 @@ export default function PartsDashboard() {
     }
 
     const sqlSetupCommand = `
--- COPY & PASTE IN SUPABASE SQL EDITOR TO CREATE TABLES:
+-- COPY & PASTE IN SUPABASE SQL EDITOR TO UPDATE OR CREATE TABLES:
 
-CREATE TABLE minion_requests (
+-- Add notes column if table already exists:
+ALTER TABLE minion_requests ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+
+-- Create table if creating from scratch:
+CREATE TABLE IF NOT EXISTS minion_requests (
     id TEXT PRIMARY KEY,
     mechanic TEXT NOT NULL,
     tail TEXT NOT NULL,
     discrepancy TEXT,
     status TEXT NOT NULL DEFAULT 'New',
     items JSONB NOT NULL DEFAULT '[]',
+    notes TEXT DEFAULT '',
     timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -720,7 +725,17 @@ alter publication supabase_realtime add table minion_annotations;
                                             <td className="px-6 py-4 font-mono text-xs text-gray-500">#{req.id.slice(-5)}</td>
                                             <td className="px-6 py-4 font-bold text-gray-200">{req.tail}</td>
                                             <td className="px-6 py-4 text-sm text-gray-300">{req.mechanic}</td>
-                                            <td className="px-6 py-4 font-mono text-xs text-gray-500">{req.discrepancy || '—'}</td>
+                                            <td className="px-6 py-4 text-xs font-mono text-gray-500">
+                                                <div className="space-y-1">
+                                                    <div>{req.discrepancy || '—'}</div>
+                                                    {req.notes && (
+                                                        <div className="flex items-center gap-1 text-[10px] text-yellow-300 font-sans font-medium italic">
+                                                            <MessageSquare size={10} className="text-yellow-400 shrink-0" />
+                                                            <span className="truncate max-w-[180px]">{req.notes}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-6 py-4 text-xs text-gray-550">{req.time}</td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
@@ -957,11 +972,12 @@ alter publication supabase_realtime add table minion_annotations;
                                                                                                 <button
                                                                                                     onClick={(e) => {
                                                                                                         e.stopPropagation()
-                                                                                                        if (item.group) {
-                                                                                                            window.dispatchEvent(new CustomEvent('minion_jump_to_target', {
-                                                                                                                detail: { type: 'idx', value: item.group, group: item.group }
-                                                                                                            }))
-                                                                                                        }
+                                                                                                        localStorage.setItem('minion_pending_jump', JSON.stringify({
+                                                                                                            type: 'idx',
+                                                                                                            value: item.group || item.part_number,
+                                                                                                            group: item.group || '',
+                                                                                                            partNumber: item.part_number
+                                                                                                        }))
                                                                                                         navigate('/catalog')
                                                                                                     }}
                                                                                                     className="px-1.5 py-0.5 rounded bg-minion-500/10 hover:bg-minion-500 text-minion-400 hover:text-black border border-minion-500/30 text-[9px] font-bold flex items-center gap-0.5 transition-all cursor-pointer shrink-0"

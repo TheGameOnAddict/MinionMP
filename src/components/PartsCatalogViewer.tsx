@@ -1176,13 +1176,33 @@ export default function PartsCatalogViewer() {
                 const page = meta[`pg-${value.toUpperCase()}`]
                 if (page) targetPage = page
             } else if (type === 'idx') {
-                // Extract the page code from the group string: e.g. "fig. 1 | -14a pg. 1A17"
-                const match = group.match(/pg\.\s*([^\s|]+)/i)
-                if (match) {
-                    const pageCode = match[1].toUpperCase()
+                // 1. Try extracting page code e.g. "pg. 1A17" or "1A17"
+                const pgMatch = (group || value || '').match(/pg\.\s*([^\s|]+)/i)
+                if (pgMatch) {
+                    const pageCode = pgMatch[1].toUpperCase()
                     const page = meta[`pg-${pageCode}`]
-                    console.log('[Jump] idx page code:', pageCode, '-> page:', page)
                     if (page) targetPage = page
+                }
+
+                // 2. Try extracting figure e.g. "fig. 1"
+                if (targetPage <= 0) {
+                    const figMatch = (group || value || '').match(/fig\.\s*([^|]+)/i)
+                    if (figMatch) {
+                        const figNum = figMatch[1].trim()
+                        const page = meta[`fig-${figNum.toLowerCase()}`]
+                        if (page) targetPage = page
+                    }
+                }
+
+                // 3. Match idx key directly in meta
+                if (targetPage <= 0 && value) {
+                    const cleanVal = value.replace(/^-\s*/, '').toLowerCase()
+                    for (const [k, v] of Object.entries(meta)) {
+                        if (typeof v === 'number' && (k.toLowerCase().includes(cleanVal) || k.toLowerCase().includes(`idx-${cleanVal}`))) {
+                            targetPage = v
+                            break
+                        }
+                    }
                 }
             }
 
@@ -1212,7 +1232,28 @@ export default function PartsCatalogViewer() {
 
         window.addEventListener('minion_jump_to_target', handleJump)
         return () => window.removeEventListener('minion_jump_to_target', handleJump)
-    }, [pdfDoc])
+    }, [pdfDoc, pdfMetadata])
+
+    // Process pending jump target (e.g. when navigating from Dashboard)
+    useEffect(() => {
+        if (!pdfDoc) return
+        const pendingStr = localStorage.getItem('minion_pending_jump')
+        if (!pendingStr) return
+
+        try {
+            const pending = JSON.parse(pendingStr)
+            localStorage.removeItem('minion_pending_jump')
+            console.log('[CatalogViewer] Executing pending jump from Dashboard:', pending)
+
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('minion_jump_to_target', {
+                    detail: pending
+                }))
+            }, 400)
+        } catch (e) {
+            console.error('Failed to parse minion_pending_jump:', e)
+        }
+    }, [pdfDoc, pdfMetadata])
 
     // Fetch annotations from DB/Sync
     const fetchAnnotations = async () => {
