@@ -127,7 +127,14 @@ BEGIN
 END $$;
 
 -- ========================================================
--- Storage Buckets Setup:
--- 1. Storage -> Create Bucket -> Name: part-images (Public: ON)
--- 2. Storage -> Create Bucket -> Name: catalogs (Public: ON)
+-- Storage Buckets & Anonymous Storage Policies
 -- ========================================================
+
+INSERT INTO storage.buckets (id, name, public) VALUES ('catalogs', 'catalogs', true) ON CONFLICT (id) DO UPDATE SET public = true;
+INSERT INTO storage.buckets (id, name, public) VALUES ('part-images', 'part-images', true) ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Public Anon Storage Access Catalogs" ON storage.objects;
+CREATE POLICY "Public Anon Storage Access Catalogs" ON storage.objects FOR ALL USING (bucket_id = 'catalogs') WITH CHECK (bucket_id = 'catalogs');
+
+DROP POLICY IF EXISTS "Public Anon Storage Access Part Images" ON storage.objects;
+CREATE POLICY "Public Anon Storage Access Part Images" ON storage.objects FOR ALL USING (bucket_id = 'part-images') WITH CHECK (bucket_id = 'part-images');
