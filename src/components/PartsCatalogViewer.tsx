@@ -837,19 +837,53 @@ export default function PartsCatalogViewer() {
 
             setPdfLoading(true)
             try {
-                const loadingTask = pdfjsLib.getDocument(pdfUrl)
-                const pdf = await loadingTask.promise
-                setPdfDoc(pdf)
-                setNumPages(pdf.numPages)
-                setPageNumber(prev => Math.min(pdf.numPages, Math.max(1, prev)))
+                let doc: any = null
+
+                // 1. Try local IndexedDB ArrayBuffer first (Instant, 100% reliable for local updates)
+                if (pdfName && pdfName !== DEFAULT_CATALOG.id) {
+                    try {
+                        const localBlob = await getPdfFromIndexedDb(pdfName)
+                        if (localBlob) {
+                            const buffer = await localBlob.arrayBuffer()
+                            doc = await pdfjsLib.getDocument({ data: buffer }).promise
+                        }
+                    } catch (e) {
+                        console.warn('IndexedDB blob read notice:', e)
+                    }
+                }
+
+                // 2. Try fetching pdfUrl as ArrayBuffer from Cloud
+                if (!doc && pdfUrl) {
+                    if (pdfUrl.startsWith('data:') || pdfUrl.startsWith('blob:') || pdfUrl === 'sample-catalog.pdf') {
+                        doc = await pdfjsLib.getDocument(pdfUrl).promise
+                    } else {
+                        // Strip any query strings before fetch if needed, use cache reload
+                        const cleanUrl = pdfUrl.split('#')[0]
+                        const response = await fetch(cleanUrl, { cache: 'reload' })
+                        if (response.ok) {
+                            const buffer = await response.arrayBuffer()
+                            doc = await pdfjsLib.getDocument({ data: buffer }).promise
+                        }
+                    }
+                }
+
+                // 3. Fallback to default sample catalog
+                if (!doc) {
+                    doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
+                }
+
+                setPdfDoc(doc)
+                setNumPages(doc.numPages)
+                setPageNumber(prev => Math.min(doc.numPages, Math.max(1, prev)))
             } catch (err) {
                 console.error('Failed to load PDF:', err)
                 showToast('Failed to load parts catalog PDF', 'error')
+            } finally {
+                setPdfLoading(false)
             }
-            setPdfLoading(false)
         }
         loadPdf()
-    }, [pdfUrl])
+    }, [pdfUrl, pdfName])
 
     // Background metadata scanner: maps figure outlines and page footers to physical page numbers
     useEffect(() => {

@@ -38,17 +38,32 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                     return
                 }
                 let doc: any = null
+                // 1. Try local IndexedDB blob first
+                if (catalog.id !== DEFAULT_CATALOG.id) {
+                    try {
+                        const blob = await getPdfFromIndexedDb(catalog.id)
+                        if (blob) {
+                            const arrayBuffer = await blob.arrayBuffer()
+                            doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+                        }
+                    } catch (e) {}
+                }
 
-                if (catalog.pdf_url) {
-                    doc = await pdfjsLib.getDocument(catalog.pdf_url).promise
-                } else {
-                    const blob = await getPdfFromIndexedDb(catalog.id)
-                    if (blob) {
-                        const arrayBuffer = await blob.arrayBuffer()
-                        doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-                    } else if (catalog.id === DEFAULT_CATALOG.id) {
-                        doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
-                    }
+                // 2. Try fetching cloud pdf_url as ArrayBuffer
+                if (!doc && catalog.pdf_url) {
+                    try {
+                        const cleanUrl = catalog.pdf_url.split('#')[0]
+                        const response = await fetch(cleanUrl, { cache: 'reload' })
+                        if (response.ok) {
+                            const arrayBuffer = await response.arrayBuffer()
+                            doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+                        }
+                    } catch (e) {}
+                }
+
+                // 3. Fallback to static default
+                if (!doc) {
+                    doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
                 }
 
                 if (doc && active) {
