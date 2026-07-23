@@ -233,7 +233,7 @@ function PageCarouselThumbnail({ pdfDoc, pageNum, active, onClick }: { pdfDoc: a
     )
 }
 
-function PrintPagePreviewThumbnail({ pdfDoc, pageNum }: { pdfDoc: any; pageNum: number }) {
+function PrintPagePreviewThumbnail({ pdfDoc, pageNum, active, onClick }: { pdfDoc: any; pageNum: number; active?: boolean; onClick?: () => void }) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [loading, setLoading] = useState(true)
 
@@ -262,12 +262,216 @@ function PrintPagePreviewThumbnail({ pdfDoc, pageNum }: { pdfDoc: any; pageNum: 
     }, [pdfDoc, pageNum])
 
     return (
-        <div className="flex flex-col items-center bg-gray-950 p-1.5 rounded-lg border border-gray-800 shrink-0 select-none">
+        <div
+            onClick={onClick}
+            className={`flex flex-col items-center bg-gray-950 p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 select-none ${active ? 'border-minion-500 ring-2 ring-minion-500/40 bg-gray-900' : 'border-gray-800 hover:border-gray-700'}`}
+        >
             <div className="relative w-16 h-20 bg-gray-900 rounded overflow-hidden flex items-center justify-center border border-gray-800">
                 {loading && <RefreshCw size={12} className="animate-spin text-minion-400 absolute" />}
                 <canvas ref={canvasRef} className="block max-w-full max-h-full" />
             </div>
-            <span className="text-[10px] font-bold font-mono text-minion-450 mt-1">Pg {pageNum}</span>
+            <span className={`text-[10px] font-bold font-mono mt-1 ${active ? 'text-minion-400' : 'text-gray-400'}`}>Pg {pageNum}</span>
+        </div>
+    )
+}
+
+function LargePrintPreviewCard({
+    pdfDoc,
+    pageNum,
+    width,
+    height,
+    overlays,
+    annotations
+}: {
+    pdfDoc: any
+    pageNum: number
+    width: number
+    height: number
+    overlays: { rects: { x: number; y: number; w: number; h: number }[] }[]
+    annotations: PDFAnnotation[]
+}) {
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        let isSubscribed = true
+        if (pdfDoc && pageNum > 0) {
+            const render = async () => {
+                setLoading(true)
+                try {
+                    const page = await pdfDoc.getPage(pageNum)
+                    const vp = page.getViewport({ scale: 1.0 })
+                    const canvas = canvasRef.current
+                    if (!canvas) return
+                    const dpr = Math.max(2, window.devicePixelRatio || 1)
+                    canvas.width = Math.floor(vp.width * dpr)
+                    canvas.height = Math.floor(vp.height * dpr)
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) return
+                    await page.render({
+                        canvasContext: ctx,
+                        viewport: vp,
+                        transform: [dpr, 0, 0, dpr, 0, 0]
+                    }).promise
+                    if (isSubscribed) setLoading(false)
+                } catch (e) {
+                    console.error(e)
+                }
+            }
+            render()
+        }
+        return () => { isSubscribed = false }
+    }, [pdfDoc, pageNum])
+
+    const now = new Date()
+    const timestampStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, FOR REFERENCE ONLY`
+
+    return (
+        <div className="relative bg-white text-black rounded-xl border border-gray-700 shadow-2xl overflow-hidden w-full flex items-center justify-center max-h-[560px]" style={{ aspectRatio: width && height ? `${width} / ${height}` : '1 / 1.35' }}>
+            {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/60 z-30">
+                    <RefreshCw className="animate-spin text-minion-400" size={28} />
+                </div>
+            )}
+
+            <canvas ref={canvasRef} className="block w-full h-full object-contain" />
+
+            {/* Simple Top Right Timestamp Stamp (No Box, No URL, No Page Number) */}
+            <div className="absolute top-2 right-3 z-20 pointer-events-none text-[10px] font-mono font-bold text-gray-800">
+                {timestampStr}
+            </div>
+
+            {/* Highlights */}
+            {overlays.map((ov, oIdx) => (
+                <div key={oIdx} className="absolute inset-0 pointer-events-none z-10">
+                    {ov.rects.map((r, rIdx) => (
+                        <div
+                            key={rIdx}
+                            className="absolute"
+                            style={{
+                                left: `${r.x * 100}%`,
+                                top: `${r.y * 100}%`,
+                                width: `${r.w * 100}%`,
+                                height: `${r.h * 100}%`,
+                                background: 'rgba(255, 210, 10, 0.4)',
+                                borderRadius: 2,
+                                mixBlendMode: 'multiply'
+                            }}
+                        />
+                    ))}
+                </div>
+            ))}
+
+            {/* SVG Annotations */}
+            <svg
+                viewBox={`0 0 ${width || 1000} ${height || 1350}`}
+                className="absolute top-0 left-0 w-full h-full pointer-events-none z-15"
+            >
+                {annotations.map(anno => {
+                    if (anno.type === 'rect' && anno.x !== undefined && anno.y !== undefined) {
+                        return (
+                            <rect
+                                key={anno.id}
+                                x={anno.x * width}
+                                y={anno.y * height}
+                                width={(anno.width || 0) * width}
+                                height={(anno.height || 0) * height}
+                                fill="none"
+                                stroke={anno.color}
+                                strokeWidth={anno.thickness || 3}
+                            />
+                        )
+                    }
+                    if (anno.type === 'circle' && anno.x !== undefined && anno.y !== undefined) {
+                        const rx = ((anno.width || 0) * width) / 2
+                        const ry = ((anno.height || 0) * height) / 2
+                        const cx = (anno.x * width) + rx
+                        const cy = (anno.y * height) + ry
+                        return (
+                            <ellipse
+                                key={anno.id}
+                                cx={cx}
+                                cy={cy}
+                                rx={rx}
+                                ry={ry}
+                                fill="none"
+                                stroke={anno.color}
+                                strokeWidth={anno.thickness || 3}
+                            />
+                        )
+                    }
+                    if (anno.type === 'pen' && anno.points && anno.points.length > 1) {
+                        const pathData = anno.points.reduce((acc, pt, i) => {
+                            const px = pt.x * width
+                            const py = pt.y * height
+                            return i === 0 ? `M ${px} ${py}` : `${acc} L ${px} ${py}`
+                        }, '')
+                        return (
+                            <path
+                                key={anno.id}
+                                d={pathData}
+                                fill="none"
+                                stroke={anno.color}
+                                strokeWidth={anno.thickness || 3}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        )
+                    }
+                    if (anno.type === 'part_box' && anno.x !== undefined && anno.y !== undefined) {
+                        return (
+                            <g key={anno.id}>
+                                <rect
+                                    x={anno.x * width}
+                                    y={anno.y * height}
+                                    width={(anno.width || 0) * width}
+                                    height={(anno.height || 0) * height}
+                                    fill="rgba(52, 199, 89, 0.15)"
+                                    stroke="#34c759"
+                                    strokeWidth={2}
+                                />
+                                {anno.text && (
+                                    <text
+                                        x={anno.x * width + 4}
+                                        y={anno.y * height + 14}
+                                        fill="#000"
+                                        fontSize={11}
+                                        fontWeight="bold"
+                                    >
+                                        {anno.text}
+                                    </text>
+                                )}
+                            </g>
+                        )
+                    }
+                    if (anno.type === 'text' && anno.x !== undefined && anno.y !== undefined) {
+                        return (
+                            <g key={anno.id}>
+                                <rect
+                                    x={anno.x * width}
+                                    y={anno.y * height}
+                                    width={140}
+                                    height={40}
+                                    fill="#fef08a"
+                                    stroke="#ca8a04"
+                                    strokeWidth={1}
+                                    rx={4}
+                                />
+                                <text
+                                    x={anno.x * width + 6}
+                                    y={anno.y * height + 18}
+                                    fill="#854d0e"
+                                    fontSize={10}
+                                    fontWeight="bold"
+                                >
+                                    {anno.text || ''}
+                                </text>
+                            </g>
+                        )
+                    }
+                    return null
+                })}
+            </svg>
         </div>
     )
 }
@@ -407,6 +611,7 @@ export default function PartsCatalogViewer() {
     const [printPageRange, setPrintPageRange] = useState('')
     const [includePrintAnnotations, setIncludePrintAnnotations] = useState(true)
     const [includePrintHighlights, setIncludePrintHighlights] = useState(true)
+    const [selectedPreviewPageNum, setSelectedPreviewPageNum] = useState<number>(1)
     const [isPreparingPrint, setIsPreparingPrint] = useState(false)
     const [printProgressText, setPrintProgressText] = useState('')
     const [renderedPrintPages, setRenderedPrintPages] = useState<{
@@ -2573,30 +2778,8 @@ export default function PartsCatalogViewer() {
                                 <span className="text-gray-400 text-xs">Loading PDF catalog...</span>
                             </div>
                         ) : (
-                            <div className={`printable-catalog-page relative border border-gray-800 shadow-2xl bg-white ${tool === 'select' ? 'select-text' : 'select-none'}`}>
-                                <style>{`
-                                    @media print {
-                                        body * { visibility: hidden !important; }
-                                        .printable-catalog-page, .printable-catalog-page * { visibility: visible !important; }
-                                        .printable-catalog-page {
-                                            position: absolute !important;
-                                            left: 0 !important;
-                                            top: 0 !important;
-                                            width: 100% !important;
-                                            margin: 0 !important;
-                                            padding: 0 !important;
-                                            box-shadow: none !important;
-                                            border: none !important;
-                                            -webkit-print-color-adjust: exact !important;
-                                            print-color-adjust: exact !important;
-                                        }
-                                        .printable-catalog-page .absolute.right-full,
-                                        .printable-catalog-page .absolute.left-full {
-                                            display: none !important;
-                                        }
-                                    }
-                                `}</style>
-                                                          {/* Page Carousel floating to the left */}
+                            <div className={`relative border border-gray-800 shadow-2xl bg-white ${tool === 'select' ? 'select-text' : 'select-none'}`}>
+                                {/* Page Carousel floating to the left */}
                                 <div 
                                     ref={carouselRef}
                                     onScroll={handleCarouselScroll}
@@ -3378,171 +3561,222 @@ export default function PartsCatalogViewer() {
                 onRequestAdminUnlock={() => setShowAdminModal(true)}
             />
 
-            {/* Print Catalog Options Modal */}
+            {/* Print Catalog Workspace Modal */}
             {showPrintModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-6 text-gray-100">
-                        <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                            <h2 className="text-base font-bold flex items-center gap-2 text-minion-400">
-                                <Printer size={18} /> Print Parts Catalog
-                            </h2>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-6 animate-fade-in">
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-5xl w-full h-[88vh] max-h-[780px] p-6 shadow-2xl flex flex-col space-y-4 text-gray-100">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between border-b border-gray-800 pb-3 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <Printer size={20} className="text-minion-400" />
+                                <h2 className="text-base font-bold text-gray-100">
+                                    Print Catalog Workspace
+                                </h2>
+                                <span className="text-xs font-mono text-minion-450 bg-minion-500/10 px-2 py-0.5 rounded border border-minion-500/20">
+                                    {pdfName || 'MINION CATALOG'}
+                                </span>
+                            </div>
                             <button
                                 onClick={() => setShowPrintModal(false)}
                                 disabled={isPreparingPrint}
-                                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 cursor-pointer"
+                                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors"
                             >
                                 ✕
                             </button>
                         </div>
 
-                        {/* Page Selection Options */}
-                        <div className="space-y-3">
-                            <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
-                                Page Range Selection
-                            </label>
-                            
-                            <div className="space-y-2 text-xs">
-                                <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-gray-800 bg-gray-950/40 hover:border-gray-700 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="printMode"
-                                        checked={printMode === 'current'}
-                                        onChange={() => setPrintMode('current')}
-                                        className="text-minion-500 focus:ring-minion-500"
-                                    />
-                                    <span>Current Page (Page {pageNumber})</span>
-                                </label>
-
-                                <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-gray-800 bg-gray-950/40 hover:border-gray-700 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="printMode"
-                                        checked={printMode === 'range'}
-                                        onChange={() => setPrintMode('range')}
-                                        className="text-minion-500 focus:ring-minion-500"
-                                    />
-                                    <div className="flex-1 space-y-1">
-                                        <div>Custom Page Range</div>
-                                        {printMode === 'range' && (
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. 1-3, 5, 8-12"
-                                                value={printPageRange}
-                                                onChange={e => setPrintPageRange(e.target.value)}
-                                                className="w-full bg-gray-900 border border-gray-750 text-gray-100 rounded-lg px-2.5 py-1 text-xs outline-none focus:border-minion-500 font-mono"
-                                            />
-                                        )}
-                                    </div>
-                                </label>
-
-                                <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-gray-800 bg-gray-950/40 hover:border-gray-700 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="printMode"
-                                        checked={printMode === 'all'}
-                                        onChange={() => setPrintMode('all')}
-                                        className="text-minion-500 focus:ring-minion-500"
-                                    />
-                                    <span>All Pages (1 - {numPages} Pages)</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Overlays Options */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
-                                Include Overlays & Markings
-                            </label>
-                            <div className="space-y-2 text-xs">
-                                <label className="flex items-center gap-2 cursor-pointer text-gray-300">
-                                    <input
-                                        type="checkbox"
-                                        checked={includePrintAnnotations}
-                                        onChange={e => setIncludePrintAnnotations(e.target.checked)}
-                                        className="rounded text-minion-500 focus:ring-minion-500"
-                                    />
-                                    <span>Drawings, Rectangles, & Text Sticky Notes</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer text-gray-300">
-                                    <input
-                                        type="checkbox"
-                                        checked={includePrintHighlights}
-                                        onChange={e => setIncludePrintHighlights(e.target.checked)}
-                                        className="rounded text-minion-500 focus:ring-minion-500"
-                                    />
-                                    <span>Index Block & Pin Highlight Overlays</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Live Selected Pages Preview Carousel */}
+                        {/* Modal Content Split Body */}
                         {(() => {
                             const previewPages = printMode === 'current' 
                                 ? [pageNumber] 
                                 : printMode === 'all' 
                                     ? Array.from({ length: numPages }, (_, i) => i + 1) 
                                     : parsePageRange(printPageRange, numPages)
+                            
+                            const activePg = previewPages.includes(selectedPreviewPageNum) ? selectedPreviewPageNum : (previewPages[0] || pageNumber)
+
+                            let activeOverlays: { rects: { x: number; y: number; w: number; h: number }[] }[] = []
+                            if (includePrintHighlights) {
+                                if (activePg === pageNumber) {
+                                    activeOverlays = overlaysToRender
+                                } else {
+                                    const pins = pinnedIndices[activePg] || []
+                                    pins.forEach(pinLabel => {
+                                        const item = indexItems.find(it => it.label === pinLabel)
+                                        if (item) activeOverlays.push({ rects: item.rects })
+                                    })
+                                }
+                            }
+
                             return (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400">
-                                        <span>Selected Pages Preview ({previewPages.length} {previewPages.length === 1 ? 'Page' : 'Pages'})</span>
-                                        <span className="text-[10px] text-minion-450 font-mono">Live PDF Previews</span>
+                                <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden min-h-0">
+                                    {/* Left Pane: Large Live Page Preview */}
+                                    <div className="flex-1 bg-gray-950/70 border border-gray-800 rounded-2xl p-4 flex flex-col justify-between overflow-hidden min-h-0">
+                                        <div className="flex items-center justify-between pb-2 border-b border-gray-850 shrink-0">
+                                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                                                Page Preview (Page {activePg})
+                                            </span>
+                                            <span className="text-[10px] font-mono text-minion-400">
+                                                Live High-Res Canvas View
+                                            </span>
+                                        </div>
+
+                                        {/* Big Canvas Container */}
+                                        <div className="flex-1 flex items-center justify-center p-2 overflow-hidden my-2">
+                                            <LargePrintPreviewCard
+                                                pdfDoc={pdfDoc}
+                                                pageNum={activePg}
+                                                width={dimensions.width}
+                                                height={dimensions.height}
+                                                overlays={activeOverlays}
+                                                annotations={includePrintAnnotations ? annotations : []}
+                                            />
+                                        </div>
+
+                                        {/* Selected Pages Thumbnail Strip */}
+                                        {previewPages.length > 1 && (
+                                            <div className="pt-2 border-t border-gray-850 shrink-0">
+                                                <div className="text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-wider">
+                                                    Select Page to Preview ({previewPages.length} pages selected)
+                                                </div>
+                                                <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                                                    {previewPages.slice(0, 30).map(pg => (
+                                                        <PrintPagePreviewThumbnail
+                                                            key={pg}
+                                                            pdfDoc={pdfDoc}
+                                                            pageNum={pg}
+                                                            active={pg === activePg}
+                                                            onClick={() => setSelectedPreviewPageNum(pg)}
+                                                        />
+                                                    ))}
+                                                    {previewPages.length > 30 && (
+                                                        <div className="text-xs text-gray-500 font-bold p-2 shrink-0">
+                                                            +{previewPages.length - 30} more pages
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="flex items-center gap-2.5 overflow-x-auto p-2.5 bg-gray-950/70 border border-gray-800 rounded-xl custom-scrollbar min-h-[110px]">
-                                        {previewPages.length === 0 ? (
-                                            <div className="text-xs text-gray-500 italic p-3 text-center w-full">Enter a valid page range above to preview...</div>
-                                        ) : (
-                                            previewPages.slice(0, 25).map(pg => (
-                                                <PrintPagePreviewThumbnail key={pg} pdfDoc={pdfDoc} pageNum={pg} />
-                                            ))
-                                        )}
-                                        {previewPages.length > 25 && (
-                                            <div className="text-xs text-gray-500 font-bold p-3 shrink-0">+{previewPages.length - 25} more pages</div>
-                                        )}
+
+                                    {/* Right Pane: Controls Panel */}
+                                    <div className="w-full md:w-[340px] shrink-0 bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col justify-between space-y-6">
+                                        <div className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
+                                            {/* Page Selection Options */}
+                                            <div className="space-y-3">
+                                                <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
+                                                    Page Range Selection
+                                                </label>
+                                                
+                                                <div className="space-y-2 text-xs">
+                                                    <label className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-800 bg-gray-950/40 hover:border-gray-700 cursor-pointer transition-colors">
+                                                        <input
+                                                            type="radio"
+                                                            name="printMode"
+                                                            checked={printMode === 'current'}
+                                                            onChange={() => {
+                                                                setPrintMode('current')
+                                                                setSelectedPreviewPageNum(pageNumber)
+                                                            }}
+                                                            className="text-minion-500 focus:ring-minion-500"
+                                                        />
+                                                        <span className="font-semibold text-gray-200">Current Page (Page {pageNumber})</span>
+                                                    </label>
+
+                                                    <label className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-800 bg-gray-950/40 hover:border-gray-700 cursor-pointer transition-colors">
+                                                        <input
+                                                            type="radio"
+                                                            name="printMode"
+                                                            checked={printMode === 'range'}
+                                                            onChange={() => setPrintMode('range')}
+                                                            className="text-minion-500 focus:ring-minion-500"
+                                                        />
+                                                        <div className="flex-1 space-y-1.5">
+                                                            <div className="font-semibold text-gray-200">Custom Page Range</div>
+                                                            {printMode === 'range' && (
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="e.g. 1-3, 5, 8-12"
+                                                                    value={printPageRange}
+                                                                    onChange={e => setPrintPageRange(e.target.value)}
+                                                                    className="w-full bg-gray-950 border border-gray-750 text-gray-100 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-minion-500 font-mono"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </label>
+
+                                                    <label className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-800 bg-gray-950/40 hover:border-gray-700 cursor-pointer transition-colors">
+                                                        <input
+                                                            type="radio"
+                                                            name="printMode"
+                                                            checked={printMode === 'all'}
+                                                            onChange={() => setPrintMode('all')}
+                                                            className="text-minion-500 focus:ring-minion-500"
+                                                        />
+                                                        <span className="font-semibold text-gray-200">All Pages (1 - {numPages} Pages)</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            {/* Overlays Options */}
+                                            <div className="space-y-3 pt-2 border-t border-gray-800">
+                                                <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
+                                                    Include Overlays & Markings
+                                                </label>
+                                                <div className="space-y-2.5 text-xs">
+                                                    <label className="flex items-center gap-2.5 cursor-pointer text-gray-300 hover:text-white">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={includePrintAnnotations}
+                                                            onChange={e => setIncludePrintAnnotations(e.target.checked)}
+                                                            className="rounded text-minion-500 focus:ring-minion-500"
+                                                        />
+                                                        <span>Drawings, Rectangles, & Text Sticky Notes</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2.5 cursor-pointer text-gray-300 hover:text-white">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={includePrintHighlights}
+                                                            onChange={e => setIncludePrintHighlights(e.target.checked)}
+                                                            className="rounded text-minion-500 focus:ring-minion-500"
+                                                        />
+                                                        <span>Index Block & Pin Highlight Overlays</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Bottom Action Footer */}
+                                        <div className="space-y-3 pt-4 border-t border-gray-800 shrink-0">
+                                            {isPreparingPrint && (
+                                                <div className="flex items-center justify-center gap-2 text-xs text-minion-400 font-bold animate-pulse">
+                                                    <RefreshCw className="animate-spin" size={14} />
+                                                    <span>{printProgressText}</span>
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center justify-end gap-3">
+                                                <button
+                                                    onClick={() => setShowPrintModal(false)}
+                                                    disabled={isPreparingPrint}
+                                                    className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={executePrintJob}
+                                                    disabled={isPreparingPrint}
+                                                    className="flex items-center gap-1.5 px-5 py-2 bg-minion-500 hover:bg-minion-400 text-black font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-lg"
+                                                >
+                                                    <Printer size={14} />
+                                                    <span>{isPreparingPrint ? 'Rendering...' : 'Start Print'}</span>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )
                         })()}
-
-                        {/* Stamp Header Preview Info */}
-                        <div className="bg-gray-950/70 border border-gray-800 rounded-xl p-3 text-[11px] text-gray-400 space-y-1">
-                            <div className="font-bold text-gray-300 flex items-center gap-1.5">
-                                <span>📄 Header Stamp Format (Overlaid Top Right):</span>
-                            </div>
-                            <div className="font-mono text-minion-450 text-[10px]">
-                                {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, FOR REFERENCE ONLY
-                            </div>
-                            <div className="text-[10px] text-gray-500 pt-1">
-                                Suppresses browser URL footers and app titles automatically.
-                            </div>
-                        </div>
-
-                        {/* Progress Status */}
-                        {isPreparingPrint && (
-                            <div className="flex items-center justify-center gap-2 text-xs text-minion-400 font-bold animate-pulse pt-1">
-                                <RefreshCw className="animate-spin" size={14} />
-                                <span>{printProgressText}</span>
-                            </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <button
-                                onClick={() => setShowPrintModal(false)}
-                                disabled={isPreparingPrint}
-                                className="px-4 py-2 bg-gray-800 hover:bg-gray-750 text-gray-300 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={executePrintJob}
-                                disabled={isPreparingPrint}
-                                className="flex items-center gap-1.5 px-4 py-2 bg-minion-500 hover:bg-minion-400 text-black font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-lg"
-                            >
-                                <Printer size={14} />
-                                <span>{isPreparingPrint ? 'Rendering...' : 'Start Print'}</span>
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
@@ -3605,14 +3839,9 @@ export default function PartsCatalogViewer() {
                             {/* Page Canvas Image */}
                             <img src={p.canvasUrl} className="block w-full h-full object-contain" alt={`Page ${p.pageNum}`} />
 
-                            {/* Custom Header Stamp: Overlaid Top Right Inside Page */}
-                            <div className="absolute top-2 left-3 right-3 flex items-center justify-between z-10 pointer-events-none bg-white/90 backdrop-blur-xs px-3 py-1 rounded border border-gray-400 text-[10px] font-mono text-gray-900 shadow-sm">
-                                <div className="font-bold tracking-wide">
-                                    {(pdfName || 'MINION PARTS CATALOG').toUpperCase()} — PAGE {p.pageNum}
-                                </div>
-                                <div className="font-bold text-gray-900">
-                                    {timestampStr}
-                                </div>
+                            {/* Custom Header Stamp: Simple Top Right Date, Time, FOR REFERENCE ONLY (No Box, No URL, No Page Number) */}
+                            <div className="absolute top-2 right-3 z-20 pointer-events-none text-[10px] font-mono font-bold text-gray-800">
+                                {timestampStr}
                             </div>
 
                             {/* Highlights */}
