@@ -828,6 +828,7 @@ export default function PartsCatalogViewer() {
     // --- PDF.js LOADING & RENDERING ---
     useEffect(() => {
         if (!pdfUrl) return
+        console.debug('[loadPdf] Effect fired. pdfUrl:', pdfUrl.substring(0, 80))
         const loadPdf = async () => {
             const pdfjsLib = (window as any).pdfjsLib
             if (!pdfjsLib) {
@@ -838,13 +839,15 @@ export default function PartsCatalogViewer() {
 
             setPdfLoading(true)
             try {
+                console.debug('[loadPdf] Calling pdfjsLib.getDocument...')
                 const loadingTask = pdfjsLib.getDocument(pdfUrl)
                 const pdf = await loadingTask.promise
+                console.debug('[loadPdf] PDF loaded successfully. numPages:', pdf.numPages)
                 setPdfDoc(pdf)
                 setNumPages(pdf.numPages)
                 setPageNumber(prev => Math.min(pdf.numPages, Math.max(1, prev)))
             } catch (err) {
-                console.error('Failed to load PDF:', err)
+                console.error('[loadPdf] Failed to load PDF:', err)
                 showToast('Failed to load parts catalog PDF', 'error')
             } finally {
                 setPdfLoading(false)
@@ -3050,6 +3053,7 @@ export default function PartsCatalogViewer() {
                 activeCatalogId={pdfName}
                 onClose={() => setShowLibraryModal(false)}
                 onSelectCatalog={async (cat, blobUrl) => {
+                    console.debug('[onSelectCatalog] cat.id:', cat.id, 'blobUrl:', blobUrl?.substring(0, 60))
                     localStorage.setItem('minion_current_pdf_name', cat.id)
                     setPageNumber(1)
                     setPdfDoc(null) // Flush old PDF document from memory
@@ -3057,18 +3061,23 @@ export default function PartsCatalogViewer() {
 
                     // If a direct blob URL was provided (from upload/update), use it — bypasses all caching
                     if (blobUrl) {
+                        console.debug('[onSelectCatalog] Setting pdfUrl to blobUrl:', blobUrl.substring(0, 60))
                         setPdfUrl(blobUrl)
                         setPdfName(cat.id)
                     } else if (cat.pdf_url) {
-                        setPdfUrl(`${cat.pdf_url}?t=${Date.now()}`)
+                        const url = `${cat.pdf_url}?t=${Date.now()}`
+                        console.debug('[onSelectCatalog] Setting pdfUrl to cloud url:', url.substring(0, 80))
+                        setPdfUrl(url)
                         setPdfName(cat.id)
                     } else {
                         const blob = await getPdfFromIndexedDb(cat.id)
                         if (blob) {
                             const url = URL.createObjectURL(blob)
+                            console.debug('[onSelectCatalog] Setting pdfUrl from IndexedDB blob:', url)
                             setPdfUrl(url)
                             setPdfName(cat.id)
                         } else {
+                            console.debug('[onSelectCatalog] Falling back to sample-catalog.pdf')
                             setPdfUrl('sample-catalog.pdf')
                             setPdfName(DEFAULT_CATALOG.id)
                         }
