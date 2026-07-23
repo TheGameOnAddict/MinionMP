@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
-import { getPdfFromIndexedDb, fetchMergedCatalogLibrary, addCatalogToLibrary, CatalogMetadata, DEFAULT_CATALOG } from '../utils/pdfStore'
+import { getPdfFromIndexedDb, fetchMergedCatalogLibrary, addCatalogToLibrary, CatalogMetadata } from '../utils/pdfStore'
 import { extractIPCIndexBlocks, ParsedIndexBlock, ParsedItem } from '../utils/parser'
 import { adminStore } from '../utils/adminStore'
 import AdminPasswordModal from './AdminPasswordModal'
@@ -1065,29 +1065,38 @@ export default function PartsCatalogViewer() {
     // Restore stored PDF from Cloud / IndexedDB on page load
     useEffect(() => {
         const loadStoredPdf = async () => {
-            const storedName = localStorage.getItem('minion_current_pdf_name') || DEFAULT_CATALOG.id
+            const storedName = localStorage.getItem('minion_current_pdf_name')
             try {
-                // Check if catalog exists in merged catalog library with a cloud pdf_url
                 const library = await fetchMergedCatalogLibrary()
-                const match = library.find((c: CatalogMetadata) => c.id === storedName)
-
-                if (match?.pdf_url) {
-                    setPdfUrl(`${match.pdf_url}?t=${Date.now()}`)
-                    setPdfName(match.id)
-                    return
+                let match = library.find((c: CatalogMetadata) => c.id === storedName)
+                if (!match && library.length > 0) {
+                    match = library[0]
                 }
 
-                const storedBlob = await getPdfFromIndexedDb(storedName)
-                if (storedBlob) {
-                    const url = URL.createObjectURL(storedBlob)
-                    setPdfUrl(url)
-                    setPdfName(storedName)
-                } else {
-                    setPdfUrl('sample-catalog.pdf')
-                    setPdfName(DEFAULT_CATALOG.id)
+                if (match) {
+                    if ((match as any).folder_name) {
+                        setActiveCatalogFolder((match as any).folder_name)
+                    }
+                    if (match.pdf_url) {
+                        setPdfUrl(`${match.pdf_url}?t=${Date.now()}`)
+                        setPdfName(match.id)
+                        localStorage.setItem('minion_current_pdf_name', match.id)
+                        return
+                    }
+                    const storedBlob = await getPdfFromIndexedDb(match.id)
+                    if (storedBlob) {
+                        const url = URL.createObjectURL(storedBlob)
+                        setPdfUrl(url)
+                        setPdfName(match.id)
+                        localStorage.setItem('minion_current_pdf_name', match.id)
+                        return
+                    }
                 }
+
+                setShowLibraryModal(true)
             } catch (err) {
                 console.error('Failed to load PDF:', err)
+                setShowLibraryModal(true)
             }
         }
         loadStoredPdf()

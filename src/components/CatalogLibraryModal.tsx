@@ -141,20 +141,18 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
                     </button>
 
                     {/* Delete Catalog */}
-                    {!catalog.isDefault && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                if (confirm(`Delete "${catalog.name}" from catalog library?`)) {
-                                    onDelete()
-                                }
-                            }}
-                            className="p-1.5 bg-gray-900/90 hover:bg-red-500 text-gray-300 hover:text-white rounded-lg transition-colors"
-                            title="Delete Catalog"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                    )}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm(`Delete "${catalog.name}" from catalog library?`)) {
+                                onDelete()
+                            }
+                        }}
+                        className="p-1.5 bg-gray-900/90 hover:bg-red-500 text-gray-300 hover:text-white rounded-lg transition-colors"
+                        title="Delete Catalog"
+                    >
+                        <Trash2 size={14} />
+                    </button>
                 </div>
             )}
 

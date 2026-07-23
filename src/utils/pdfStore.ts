@@ -80,26 +80,33 @@ export const clearPdfFromIndexedDb = (key: string = defaultKey): Promise<void> =
 
 // --- CATALOG LIBRARY HELPERS (LOCAL + CLOUD) ---
 
+const getFolderMap = (): Record<string, { folder_id: string; folder_name: string }> => {
+    const local = localStorage.getItem('minion_catalog_folders_map')
+    if (local) {
+        try { return JSON.parse(local) } catch (e) {}
+    }
+    return {}
+}
+
 export const getCatalogLibrary = (): CatalogMetadata[] => {
     const local = localStorage.getItem('minion_catalog_library')
     if (local) {
         try {
             const list = JSON.parse(local) as CatalogMetadata[]
-            if (Array.isArray(list) && list.length > 0) return list
+            if (Array.isArray(list)) return list
         } catch (e) {
             console.error(e)
         }
     }
-    return [DEFAULT_CATALOG]
+    return []
 }
 
 export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> => {
     const localList = getCatalogLibrary()
     const cloudCatalogs = await db.getCatalogsFromCloud()
+    const folderMap = getFolderMap()
 
     const map = new Map<string, CatalogMetadata>()
-    // Always add DEFAULT_CATALOG first if present
-    map.set(DEFAULT_CATALOG.id, DEFAULT_CATALOG)
 
     if (cloudCatalogs && cloudCatalogs.length > 0) {
         // Cloud is active: populate with cloud catalogs as source of truth
@@ -120,15 +127,20 @@ export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> =>
         localList.forEach(c => map.set(c.id, c))
     }
 
-    // Secondary deduplication pass by normalized catalog name & filename to remove ghost duplicate items
+    // Apply local folder overrides & perform deduplication
     const finalItems: CatalogMetadata[] = []
     const seenNames = new Set<string>()
 
     for (const item of map.values()) {
-        const normKey = `${(item.name || '').toLowerCase().trim()}::${(item.filename || '').toLowerCase().trim()}`
-        if (!seenNames.has(normKey) || item.id === DEFAULT_CATALOG.id) {
+        const override = folderMap[item.id]
+        const finalItem = override
+            ? { ...item, folder_id: override.folder_id, folder_name: override.folder_name }
+            : item
+
+        const normKey = `${(finalItem.name || '').toLowerCase().trim()}::${(finalItem.filename || '').toLowerCase().trim()}`
+        if (!seenNames.has(normKey)) {
             seenNames.add(normKey)
-            finalItems.push(item)
+            finalItems.push(finalItem)
         }
     }
 
@@ -139,6 +151,12 @@ export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> =>
 export const addCatalogToLibrary = async (file: File, customName?: string, targetId?: string, folderId?: string, folderName?: string): Promise<CatalogMetadata> => {
     const id = targetId || `catalog_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
     const catalogName = customName || file.name.replace(/\.pdf$/i, '')
+
+    if (folderId && folderName) {
+        const folderMap = getFolderMap()
+        folderMap[id] = { folder_id: folderId, folder_name: folderName }
+        localStorage.setItem('minion_catalog_folders_map', JSON.stringify(folderMap))
+    }
 
     // 1. Upload to Supabase Cloud if active
     const cloudRes = await db.uploadCatalogToCloud(id, catalogName, file, folderId, folderName)
@@ -166,6 +184,12 @@ export const addCatalogToLibrary = async (file: File, customName?: string, targe
 }
 
 export const updateCatalogFolderInLibrary = async (catalogId: string, folderId: string, folderName: string): Promise<CatalogMetadata[]> => {
+    // 1. Persist in local folder map override
+    const folderMap = getFolderMap()
+    folderMap[catalogId] = { folder_id: folderId, folder_name: folderName }
+    localStorage.setItem('minion_catalog_folders_map', JSON.stringify(folderMap))
+
+    // 2. Update local catalog library array
     const currentList = getCatalogLibrary()
     const updated = currentList.map(c => {
         if (c.id === catalogId) {
@@ -174,15 +198,20 @@ export const updateCatalogFolderInLibrary = async (catalogId: string, folderId: 
         return c
     })
     localStorage.setItem('minion_catalog_library', JSON.stringify(updated))
+
+    // 3. Sync to Supabase cloud table if active
     await db.updateCatalogFolderInCloud(catalogId, folderId, folderName)
+
     return updated
 }
 
 export const removeCatalogFromLibrary = async (catalogId: string): Promise<void> => {
-    if (catalogId === DEFAULT_CATALOG.id) return
-
     await db.deleteCatalogFromCloud(catalogId)
     await clearPdfFromIndexedDb(catalogId)
+
+    const folderMap = getFolderMap()
+    delete folderMap[catalogId]
+    localStorage.setItem('minion_catalog_folders_map', JSON.stringify(folderMap))
 
     const currentList = getCatalogLibrary()
     const updated = currentList.filter(c => c.id !== catalogId)
