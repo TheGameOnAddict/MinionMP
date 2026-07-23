@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.minion_requests (
     discrepancy TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'New',
     items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    notes TEXT DEFAULT '',
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

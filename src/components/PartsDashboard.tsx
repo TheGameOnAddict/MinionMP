@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import {
     Search, RefreshCw, FolderOpen, ChevronDown, ChevronRight,
     Check, XCircle, Timer, FileDown,
-    Settings2, X, Download, Upload, ArrowLeft, Info, HelpCircle
+    Settings2, X, Download, Upload, ArrowLeft, Info, HelpCircle,
+    BookOpen, Plus, Printer, MessageSquare, Edit3
 } from 'lucide-react'
 import ExcelJS from 'exceljs'
 import { playDing } from '../utils/sound'
@@ -21,6 +22,18 @@ export default function PartsDashboard() {
     const [expandedRow, setExpandedRow] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [dashInterval, setDashInterval] = useState(5000)
+
+    // Feature Parity States
+    const [addingLineToReqId, setAddingLineToReqId] = useState<string | null>(null)
+    const [newLinePartNum, setNewLinePartNum] = useState('')
+    const [newLineNomenclature, setNewLineNomenclature] = useState('')
+    const [newLineQty, setNewLineQty] = useState('1')
+    const [newLineGroup, setNewLineGroup] = useState('')
+
+    const [editingNotesReqId, setEditingNotesReqId] = useState<string | null>(null)
+    const [editingNotesText, setEditingNotesText] = useState('')
+
+    const [printTicketReq, setPrintTicketReq] = useState<any | null>(null)
 
     // Settings / Backup modals state
     const [showSettingsMenu, setShowSettingsMenu] = useState(false)
@@ -49,6 +62,7 @@ export default function PartsDashboard() {
                 mechanic: req.mechanic,
                 tail: req.tail,
                 discrepancy: req.discrepancy,
+                notes: req.notes || '',
                 order_status_raw: req.status,
                 time: new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 timestamp: req.timestamp,
@@ -340,6 +354,66 @@ export default function PartsDashboard() {
         if (success) {
             fetchRequests()
             showToast('All Picked items Fulfilled')
+        }
+    }
+
+    // Add extra part to an existing order
+    const handleAddLineItemToOrder = async (requestId: string) => {
+        if (!newLinePartNum.trim()) {
+            showToast('Please enter a part number', 'error')
+            return
+        }
+        const req = requests.find(r => r.id === requestId)
+        if (!req) return
+
+        const newItem = {
+            id: `line-${Date.now()}`,
+            raw: `Dashboard Added: ${newLinePartNum}`,
+            part_number: newLinePartNum.toUpperCase().trim(),
+            nomenclature: newLineNomenclature.trim() || 'Added by Parts Room',
+            qty: newLineQty.trim() || '1',
+            original_qty: newLineQty.trim() || '1',
+            group: newLineGroup.trim() || 'Manual Add',
+            status: 'New',
+            filled_qty: ''
+        }
+
+        const updatedItems = [...(req.items || []), newItem]
+        const success = await db.updateRequest({
+            ...req,
+            items: updatedItems,
+            status: computeOrderStatus(updatedItems, undefined)
+        })
+
+        if (success) {
+            setAddingLineToReqId(null)
+            setNewLinePartNum('')
+            setNewLineNomenclature('')
+            setNewLineQty('1')
+            setNewLineGroup('')
+            fetchRequests()
+            showToast(`Added part ${newItem.part_number} to order`)
+        } else {
+            showToast('Failed to add part to order', 'error')
+        }
+    }
+
+    // Save order notes
+    const handleSaveOrderNotes = async (requestId: string, newNotes: string) => {
+        const req = requests.find(r => r.id === requestId)
+        if (!req) return
+
+        const success = await db.updateRequest({
+            ...req,
+            notes: newNotes
+        })
+
+        if (success) {
+            setEditingNotesReqId(null)
+            fetchRequests()
+            showToast('Order notes updated')
+        } else {
+            showToast('Failed to update order notes', 'error')
         }
     }
 
@@ -683,16 +757,93 @@ alter publication supabase_realtime add table minion_annotations;
                                         {/* Expanded Items Row */}
                                         {isExpanded && (() => {
                                             const { groups, order } = groupItemsByIndex(req.items || [])
+                                            const isEditingNotes = editingNotesReqId === req.id
+                                            const isAddingLine = addingLineToReqId === req.id
+
                                             return (
                                                 <tr key={`${req.id}-detail`}>
                                                     <td colSpan={8} className="px-6 py-3 bg-gray-900/40">
-                                                        <div className="pl-6 border-l border-gray-800">
-                                                            <div className="flex items-center justify-between mb-3.5">
-                                                                <div className="text-xs text-gray-500 uppercase font-bold">
-                                                                    Discrepancy: <span className="text-gray-300 normal-case font-normal">{req.discrepancy || 'Not specified'}</span>
+                                                        <div className="pl-6 border-l border-gray-800 space-y-3">
+                                                            {/* Order Notes & Actions Header */}
+                                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-850">
+                                                                <div className="space-y-1">
+                                                                    <div className="text-xs text-gray-500 uppercase font-bold flex items-center gap-2">
+                                                                        <span>Discrepancy:</span>
+                                                                        <span className="text-gray-300 normal-case font-normal">{req.discrepancy || 'Not specified'}</span>
+                                                                    </div>
+
+                                                                    {/* Order Notes Display / Edit */}
+                                                                    <div className="flex items-center gap-2 text-xs">
+                                                                        <MessageSquare size={13} className="text-minion-500 shrink-0" />
+                                                                        <span className="text-gray-400 font-bold uppercase text-[10px]">Order Notes:</span>
+                                                                        {isEditingNotes ? (
+                                                                            <div className="flex items-center gap-1.5 flex-1">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={editingNotesText}
+                                                                                    onChange={e => setEditingNotesText(e.target.value)}
+                                                                                    className="bg-gray-950 border border-gray-700 rounded px-2 py-0.5 text-xs text-gray-100 outline-none focus:border-minion-500 font-sans flex-1"
+                                                                                    placeholder="Enter order notes or special instructions..."
+                                                                                />
+                                                                                <button
+                                                                                    onClick={() => handleSaveOrderNotes(req.id, editingNotesText)}
+                                                                                    className="px-2 py-0.5 bg-minion-500 text-black text-[10px] font-bold rounded hover:bg-minion-400 cursor-pointer"
+                                                                                >
+                                                                                    Save
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => setEditingNotesReqId(null)}
+                                                                                    className="px-2 py-0.5 bg-gray-800 text-gray-400 text-[10px] rounded hover:bg-gray-750 cursor-pointer"
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className={req.notes ? 'text-yellow-300 font-medium italic' : 'text-gray-550 italic'}>
+                                                                                    {req.notes || 'No notes attached to this order.'}
+                                                                                </span>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setEditingNotesReqId(req.id)
+                                                                                        setEditingNotesText(req.notes || '')
+                                                                                    }}
+                                                                                    className="p-1 text-gray-400 hover:text-minion-400 rounded hover:bg-gray-800 cursor-pointer transition-colors"
+                                                                                    title="Edit order notes"
+                                                                                >
+                                                                                    <Edit3 size={11} />
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                                {/* Fulfill / Cancel actions */}
-                                                                <div className="flex gap-2">
+
+                                                                {/* Fulfill / Cancel / Add Part / Print actions */}
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    {/* Print Ticket Button */}
+                                                                    <button
+                                                                        onClick={() => setPrintTicketReq(req)}
+                                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded bg-purple-600/20 text-purple-300 hover:bg-purple-600/40 transition-colors border border-purple-500/30 cursor-pointer"
+                                                                        title="Print physical pick ticket for stockroom"
+                                                                    >
+                                                                        <Printer size={11} /> Print Ticket
+                                                                    </button>
+
+                                                                    {/* Add Line Item Button */}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setAddingLineToReqId(isAddingLine ? null : req.id)
+                                                                            setNewLinePartNum('')
+                                                                            setNewLineNomenclature('')
+                                                                            setNewLineQty('1')
+                                                                            setNewLineGroup('')
+                                                                        }}
+                                                                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded bg-minion-500/20 text-minion-400 hover:bg-minion-500/40 transition-colors border border-minion-500/30 cursor-pointer"
+                                                                        title="Add a missing part to this active order"
+                                                                    >
+                                                                        <Plus size={11} /> Add Part
+                                                                    </button>
+
                                                                     <button
                                                                         onClick={() => handleMarkAllLines(req.id, 'Fulfilled')}
                                                                         className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors border border-emerald-500/25 cursor-pointer"
@@ -715,6 +866,59 @@ alter publication supabase_realtime add table minion_annotations;
                                                                     </button>
                                                                 </div>
                                                             </div>
+
+                                                            {/* Inline Add Part Form */}
+                                                            {isAddingLine && (
+                                                                <div className="bg-gray-950/70 border border-minion-500/30 rounded-xl p-3 space-y-2 animate-fade-in">
+                                                                    <div className="text-xs font-bold text-minion-400 flex items-center gap-1.5">
+                                                                        <Plus size={13} /> Add Extra Line Item to Order #{req.id.slice(-5)}
+                                                                    </div>
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Part Number (Required)"
+                                                                            value={newLinePartNum}
+                                                                            onChange={e => setNewLinePartNum(e.target.value)}
+                                                                            className="bg-gray-900 border border-gray-800 rounded px-2.5 py-1.5 text-xs text-white uppercase font-mono outline-none focus:border-minion-500"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Nomenclature / Description"
+                                                                            value={newLineNomenclature}
+                                                                            onChange={e => setNewLineNomenclature(e.target.value)}
+                                                                            className="bg-gray-900 border border-gray-800 rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-minion-500"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Qty (default 1)"
+                                                                            value={newLineQty}
+                                                                            onChange={e => setNewLineQty(e.target.value)}
+                                                                            className="bg-gray-900 border border-gray-800 rounded px-2.5 py-1.5 text-xs text-white font-mono outline-none focus:border-minion-500"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Index / Location (e.g. -14a)"
+                                                                            value={newLineGroup}
+                                                                            onChange={e => setNewLineGroup(e.target.value)}
+                                                                            className="bg-gray-900 border border-gray-800 rounded px-2.5 py-1.5 text-xs text-white font-mono outline-none focus:border-minion-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex justify-end gap-2 pt-1">
+                                                                        <button
+                                                                            onClick={() => setAddingLineToReqId(null)}
+                                                                            className="px-3 py-1 bg-gray-800 text-gray-300 text-xs rounded hover:bg-gray-750 cursor-pointer"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleAddLineItemToOrder(req.id)}
+                                                                            className="px-3 py-1 bg-minion-500 text-black font-bold text-xs rounded hover:bg-minion-400 cursor-pointer shadow"
+                                                                        >
+                                                                            Save Part to Order
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
 
                                                             <table className="w-full text-xs text-gray-300" style={{ tableLayout: 'fixed' }}>
                                                                 <colgroup>
@@ -747,7 +951,26 @@ alter publication supabase_realtime add table minion_annotations;
                                                                                 const isCanceled = item.status === 'Canceled'
                                                                                 return (
                                                                                     <tr key={`${groupKey}-${idx}`} className={`border-b border-gray-850 hover:bg-gray-800/10 ${isCanceled ? 'opacity-30 line-through' : ''}`}>
-                                                                                        <td className="py-2 font-mono text-minion-450 truncate">{item.part_number}</td>
+                                                                                        <td className="py-2 font-mono text-minion-450 truncate">
+                                                                                            <div className="flex items-center gap-1.5 truncate">
+                                                                                                <span className="truncate">{item.part_number}</span>
+                                                                                                <button
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation()
+                                                                                                        if (item.group) {
+                                                                                                            window.dispatchEvent(new CustomEvent('minion_jump_to_target', {
+                                                                                                                detail: { type: 'idx', value: item.group, group: item.group }
+                                                                                                            }))
+                                                                                                        }
+                                                                                                        navigate('/catalog')
+                                                                                                    }}
+                                                                                                    className="px-1.5 py-0.5 rounded bg-minion-500/10 hover:bg-minion-500 text-minion-400 hover:text-black border border-minion-500/30 text-[9px] font-bold flex items-center gap-0.5 transition-all cursor-pointer shrink-0"
+                                                                                                    title="Open in PDF Catalog Viewer"
+                                                                                                >
+                                                                                                    <BookOpen size={10} /> View
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </td>
                                                                                         <td className="py-2 truncate text-gray-300">{item.nomenclature}</td>
                                                                                         <td className="py-2 text-center">
                                                                                             <input
@@ -837,6 +1060,97 @@ alter publication supabase_realtime add table minion_annotations;
                     </table>
                 </div>
             </div>
+
+            {/* Printable Pick Ticket Modal */}
+            {printTicketReq && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in select-none">
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between pb-4 border-b border-gray-800 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <Printer className="text-minion-500" size={20} />
+                                <h3 className="text-lg font-extrabold text-white">Parts Pick Ticket Preview</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => window.print()}
+                                    className="px-4 py-2 bg-minion-500 hover:bg-minion-400 text-black font-bold rounded-xl text-xs flex items-center gap-1.5 shadow cursor-pointer transition-colors"
+                                >
+                                    <Printer size={14} /> Print Ticket
+                                </button>
+                                <button
+                                    onClick={() => setPrintTicketReq(null)}
+                                    className="p-2 hover:bg-gray-800 rounded-xl text-gray-400 hover:text-white cursor-pointer"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Ticket Paper Area (Print Target) */}
+                        <div className="flex-1 overflow-auto p-6 bg-white text-black rounded-xl my-4 font-sans select-text shadow-inner custom-scrollbar printable-ticket-content">
+                            <style>{`
+                                @media print {
+                                    body * { visibility: hidden !important; }
+                                    .printable-ticket-content, .printable-ticket-content * { visibility: visible !important; }
+                                    .printable-ticket-content { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; color: black; background: white; }
+                                }
+                            `}</style>
+
+                            <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-2xl font-black tracking-tight text-black">MINION MP — PARTS PICK TICKET</h1>
+                                    <p className="text-xs font-bold text-gray-700">AIRCRAFT PARTS REQUISITION & PICK LIST</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-lg font-mono font-bold">#{printTicketReq.id.slice(-5)}</div>
+                                    <div className="text-xs text-gray-600">{new Date(printTicketReq.timestamp).toLocaleString()}</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-100 rounded-lg text-xs font-semibold">
+                                <div><span className="text-gray-500 uppercase text-[10px] block">AIRCRAFT TAIL:</span> <span className="text-sm font-bold">{printTicketReq.tail}</span></div>
+                                <div><span className="text-gray-500 uppercase text-[10px] block">REQUESTING MECHANIC:</span> <span className="text-sm font-bold">{printTicketReq.mechanic}</span></div>
+                                <div className="col-span-2"><span className="text-gray-500 uppercase text-[10px] block">DISCREPANCY:</span> <span>{printTicketReq.discrepancy || 'Not specified'}</span></div>
+                                {printTicketReq.notes && (
+                                    <div className="col-span-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-900"><span className="font-bold">ORDER NOTES:</span> {printTicketReq.notes}</div>
+                                )}
+                            </div>
+
+                            <table className="w-full text-xs text-left border-collapse mb-6">
+                                <thead>
+                                    <tr className="border-b-2 border-black text-[11px] uppercase font-bold text-gray-700">
+                                        <th className="py-2 w-8 text-center">[✓]</th>
+                                        <th className="py-2">PART NUMBER</th>
+                                        <th className="py-2">NOMENCLATURE</th>
+                                        <th className="py-2 text-center">INDEX / LOC</th>
+                                        <th className="py-2 text-center">QTY REQ</th>
+                                        <th className="py-2 text-center">QTY PICKED</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(printTicketReq.items || []).map((item: any, idx: number) => (
+                                        <tr key={idx} className="border-b border-gray-300 py-2">
+                                            <td className="py-2 text-center font-bold text-base">□</td>
+                                            <td className="py-2 font-mono font-bold">{item.part_number}</td>
+                                            <td className="py-2">{item.nomenclature}</td>
+                                            <td className="py-2 text-center font-mono text-xs">{item.group || '—'}</td>
+                                            <td className="py-2 text-center font-bold text-sm">{item.qty}</td>
+                                            <td className="py-2 text-center text-gray-400">______</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            <div className="mt-8 pt-4 border-t border-gray-300 flex justify-between text-[11px] text-gray-600 font-medium">
+                                <div>Picked By: ___________________________</div>
+                                <div>Date / Time: _______________________</div>
+                                <div>Received By: ________________________</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* JSON Backup Manager Modal */}
             {showBackupModal && (

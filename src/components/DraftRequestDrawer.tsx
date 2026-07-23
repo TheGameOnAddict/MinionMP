@@ -97,6 +97,7 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
     const [mechanicName, setMechanicName] = useState(() => localStorage.getItem('minion_draft_mechanic') || '')
     const [tail, setTail] = useState(() => localStorage.getItem('minion_draft_tail') || '')
     const [discrepancy, setDiscrepancy] = useState('')
+    const [orderNotes, setOrderNotes] = useState('')
 
     // Manual Entry
     const [showManualEntry, setShowManualEntry] = useState(true)
@@ -300,13 +301,15 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
             tail: tail.toUpperCase(),
             discrepancy,
             status: 'New',
-            items: finalItems
+            items: finalItems,
+            notes: orderNotes
         })
 
         if (result.success) {
             showToast(`Request submitted! ID: #${id.slice(-5)}`, 'success')
             handleClearDraft()
             setDiscrepancy('')
+            setOrderNotes('')
             // Close drawer after short delay
             setTimeout(() => onClose(), 1000)
         } else {
@@ -585,12 +588,24 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                     </div>
                 </div>
 
-                {/* Submit Action */}
-                <div className="p-4 border-t border-gray-800 bg-gray-900/90 flex shrink-0">
+                {/* Submit Action & Order Notes */}
+                <div className="p-4 border-t border-gray-800 bg-gray-900/90 flex flex-col gap-3 shrink-0">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">
+                            Order Notes / Special Instructions (Optional)
+                        </label>
+                        <textarea
+                            rows={2}
+                            value={orderNotes}
+                            onChange={e => setOrderNotes(e.target.value)}
+                            placeholder="e.g., Need by 2 PM, AOG, Deliver to Hangar 3..."
+                            className="w-full bg-gray-950/80 border border-gray-800 rounded-lg p-2 text-xs text-gray-200 placeholder-gray-600 outline-none focus:border-minion-500 focus:ring-1 focus:ring-minion-500/30 font-sans custom-scrollbar resize-none"
+                        />
+                    </div>
                     <button
                         onClick={handleSubmitRequest}
                         disabled={draftItems.length === 0}
-                        className="flex-1 bg-gradient-to-r from-minion-400 to-minion-600 hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed transition-all py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-black shadow-lg shadow-yellow-950/20 cursor-pointer text-xs"
+                        className="w-full bg-gradient-to-r from-minion-400 to-minion-600 hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed transition-all py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-black shadow-lg shadow-yellow-950/20 cursor-pointer text-xs"
                     >
                         <Send size={14} /> Submit Order
                     </button>

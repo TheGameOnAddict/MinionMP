@@ -22,6 +22,7 @@ export interface PartsRequest {
     status: string // New, Processing, Ready, Picked, etc.
     items: RequestLineItem[]
     timestamp: string
+    notes?: string
 }
 
 export interface PDFAnnotation {
@@ -137,7 +138,8 @@ class DbService {
                     discrepancy: row.discrepancy,
                     status: row.status,
                     items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items,
-                    timestamp: row.timestamp
+                    timestamp: row.timestamp,
+                    notes: row.notes || ''
                 }))
             } catch (e) {
                 console.error('Supabase getRequests failed, falling back to localStorage:', e)
@@ -174,7 +176,8 @@ class DbService {
                         tail: fullReq.tail,
                         discrepancy: fullReq.discrepancy,
                         status: fullReq.status,
-                        items: fullReq.items
+                        items: fullReq.items,
+                        notes: fullReq.notes || ''
                     })
 
                 if (error) throw error
@@ -231,7 +234,8 @@ class DbService {
                         tail: req.tail,
                         discrepancy: req.discrepancy,
                         status: req.status,
-                        items: req.items
+                        items: req.items,
+                        notes: req.notes || ''
                     })
                     .eq('id', req.id)
 
