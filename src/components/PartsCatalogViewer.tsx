@@ -609,7 +609,7 @@ export default function PartsCatalogViewer() {
     const numPagesRef = useRef<number>(0)
     const pageNumberRef = useRef<number>(0)
     const indexBlocksRef = useRef<ParsedIndexBlock[]>([])
-    const pendingJumpIndexRef = useRef<string | null>(null)
+    const pendingJumpTargetRef = useRef<{ indexStr?: string; partNumber?: string } | null>(null)
     const [pinnedIndices, setPinnedIndices] = useState<Record<number, string[]>>({})
     const [indexSelections, setIndexSelections] = useState<Record<number, Record<string, Record<string, boolean>>>>({})
     const indexSelectionsRef = useRef<Record<number, Record<string, Record<string, boolean>>>>({})
@@ -1138,10 +1138,19 @@ export default function PartsCatalogViewer() {
         }
     }, [pageNumber, pinnedIndices])
 
+    const cleanIndexLabel = (str: string): string => {
+        if (!str) return ''
+        const match = str.match(/-\s*(\d{1,4}[A-Za-z]?(?:-\d+)?)/)
+        if (match) {
+            return `-${match[1]}`.toLowerCase()
+        }
+        return str.replace(/^-\s*/, '').trim().toLowerCase()
+    }
+
     // Event listener for drawer chip click jump commands (registered once per pdfDoc load)
     useEffect(() => {
         const handleJump = async (e: Event) => {
-            const { type, value, group } = (e as CustomEvent).detail
+            const { type, value, group, partNumber } = (e as CustomEvent).detail || {}
             if (!pdfDoc) return
 
             const curPage = pageNumberRef.current
@@ -1176,6 +1185,8 @@ export default function PartsCatalogViewer() {
                 const page = meta[`pg-${value.toUpperCase()}`]
                 if (page) targetPage = page
             } else if (type === 'idx') {
+                pendingJumpTargetRef.current = { indexStr: value || group, partNumber }
+
                 // 1. Try extracting page code e.g. "pg. 1A17" or "1A17"
                 const pgMatch = (group || value || '').match(/pg\.\s*([^\s|]+)/i)
                 if (pgMatch) {
@@ -1196,7 +1207,7 @@ export default function PartsCatalogViewer() {
 
                 // 3. Match idx key directly in meta
                 if (targetPage <= 0 && value) {
-                    const cleanVal = value.replace(/^-\s*/, '').toLowerCase()
+                    const cleanVal = cleanIndexLabel(value)
                     for (const [k, v] of Object.entries(meta)) {
                         if (typeof v === 'number' && (k.toLowerCase().includes(cleanVal) || k.toLowerCase().includes(`idx-${cleanVal}`))) {
                             targetPage = v
@@ -1207,10 +1218,18 @@ export default function PartsCatalogViewer() {
             }
 
             if (targetPage > 0 && targetPage <= totalPages) {
+                setTool('index')
                 if (targetPage === curPage) {
                     if (type === 'idx') {
-                        setTool('index')
-                        const foundIdx = blocks.findIndex(b => b.label.toLowerCase() === value.toLowerCase())
+                        const cleanTarget = cleanIndexLabel(value || group)
+                        let foundIdx = blocks.findIndex(b => {
+                            const cleanLabel = cleanIndexLabel(b.label)
+                            return cleanLabel === cleanTarget || (cleanTarget && (cleanLabel.includes(cleanTarget) || cleanTarget.includes(cleanLabel)))
+                        })
+                        if (foundIdx < 0 && partNumber) {
+                            const cleanPart = partNumber.trim().toLowerCase()
+                            foundIdx = blocks.findIndex(b => b.items.some((it: ParsedItem) => it.partNumber.trim().toLowerCase() === cleanPart))
+                        }
                         if (foundIdx >= 0) {
                             setActiveIndex(foundIdx)
                             setStagedItems(blocks[foundIdx]?.items.map((item: ParsedItem) => ({ ...item, selected: true })) || [])
@@ -1219,10 +1238,6 @@ export default function PartsCatalogViewer() {
                 } else {
                     setPageNumber(targetPage)
                     showToast(`Jumped to Page ${targetPage}`)
-                    if (type === 'idx') {
-                        setTool('index')
-                        pendingJumpIndexRef.current = value
-                    }
                 }
             } else {
                 console.warn('[Jump] FAILED. type:', type, 'value:', value, '| merged meta keys:', Object.keys(meta))
@@ -1386,12 +1401,28 @@ export default function PartsCatalogViewer() {
                 setIndexBlocks(blocks)
 
                 let activeIdx = 0
-                if (pendingJumpIndexRef.current) {
-                    const foundIdx = blocks.findIndex(b => b.label.toLowerCase() === pendingJumpIndexRef.current?.toLowerCase())
+                if (pendingJumpTargetRef.current) {
+                    const { indexStr, partNumber } = pendingJumpTargetRef.current
+                    let foundIdx = -1
+
+                    if (indexStr) {
+                        const cleanTarget = cleanIndexLabel(indexStr)
+                        foundIdx = blocks.findIndex(b => {
+                            const cleanLabel = cleanIndexLabel(b.label)
+                            return cleanLabel === cleanTarget || (cleanTarget && (cleanLabel.includes(cleanTarget) || cleanTarget.includes(cleanLabel)))
+                        })
+                    }
+
+                    if (foundIdx < 0 && partNumber) {
+                        const cleanPart = partNumber.trim().toLowerCase()
+                        foundIdx = blocks.findIndex(b => b.items.some((it: ParsedItem) => it.partNumber.trim().toLowerCase() === cleanPart))
+                    }
+
                     if (foundIdx >= 0) {
                         activeIdx = foundIdx
+                        setTool('index')
                     }
-                    pendingJumpIndexRef.current = null
+                    pendingJumpTargetRef.current = null
                 }
                 setActiveIndex(activeIdx)
                 const initialBlock = blocks[activeIdx]
