@@ -34,6 +34,9 @@ jobs:
         run: npm ci
 
       - name: Build Project
+        env:
+          VITE_SUPABASE_URL: https://cbfbluppgrjuadetvxbt.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiZmJsdXBwZ3JqdWFkZXR2eGJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NjE5MDgsImV4cCI6MjEwMDMzNzkwOH0.UBVGcIb1A2lA25GuSh7BZwkXZqLmTPs-RSydPG-z5aM
         run: npm run build
 
       - name: Setup Pages
