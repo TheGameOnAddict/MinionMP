@@ -151,6 +151,7 @@ export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> =>
 export const addCatalogToLibrary = async (file: File, customName?: string, targetId?: string, folderId?: string, folderName?: string): Promise<CatalogMetadata> => {
     const id = targetId || `catalog_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
     const catalogName = customName || file.name.replace(/\.pdf$/i, '')
+    const versionTag = String(Date.now())
 
     if (folderId && folderName) {
         const folderMap = getFolderMap()
@@ -172,8 +173,9 @@ export const addCatalogToLibrary = async (file: File, customName?: string, targe
         uploadDate: new Date().toLocaleDateString()
     }
 
-    // 2. Save blob to IndexedDB under catalog id (for fast local caching)
+    // 2. Save blob to IndexedDB under catalog id (overwrites old local cached version)
     await savePdfToIndexedDb(file, id)
+    localStorage.setItem(`minion_pdf_ver_${id}`, versionTag)
 
     // 3. Save catalog metadata list locally
     const currentList = getCatalogLibrary()
@@ -205,7 +207,16 @@ export const updateCatalogFolderInLibrary = async (catalogId: string, folderId: 
     return updated
 }
 
-export const loadCatalogPdfBlob = async (catId: string, pdfUrl?: string): Promise<string | null> => {
+export const loadCatalogPdfBlob = async (catId: string, pdfUrl?: string, updatedTag?: string): Promise<string | null> => {
+    const cachedVer = localStorage.getItem(`minion_pdf_ver_${catId}`)
+
+    // If Cloud catalog was updated with a newer version timestamp, invalidate stale local cache!
+    if (updatedTag && cachedVer && updatedTag !== cachedVer) {
+        console.log(`Catalog ${catId} updated in cloud (${updatedTag}). Invalidating old local IndexedDB cache...`)
+        await clearPdfFromIndexedDb(catId)
+        localStorage.setItem(`minion_pdf_ver_${catId}`, updatedTag)
+    }
+
     // 1. Try local IndexedDB blob first (Instant 0.05s load, zero network latency!)
     try {
         const localBlob = await getPdfFromIndexedDb(catId)
@@ -216,13 +227,17 @@ export const loadCatalogPdfBlob = async (catId: string, pdfUrl?: string): Promis
         console.warn('IndexedDB read warning:', e)
     }
 
-    // 2. Fetch from Cloud URL & save to IndexedDB in background
+    // 2. Fetch fresh PDF from Cloud URL & save to IndexedDB in background
     if (pdfUrl) {
         try {
-            const response = await fetch(pdfUrl)
+            const fetchUrl = updatedTag ? `${pdfUrl}?v=${encodeURIComponent(updatedTag)}` : pdfUrl
+            const response = await fetch(fetchUrl)
             if (response.ok) {
                 const blob = await response.blob()
-                savePdfToIndexedDb(blob, catId).catch(err => console.warn('Background cache error:', err))
+                await savePdfToIndexedDb(blob, catId)
+                if (updatedTag) {
+                    localStorage.setItem(`minion_pdf_ver_${catId}`, updatedTag)
+                }
                 return URL.createObjectURL(blob)
             }
         } catch (e) {

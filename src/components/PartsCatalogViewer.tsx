@@ -1077,7 +1077,7 @@ export default function PartsCatalogViewer() {
                     if ((match as any).folder_name) {
                         setActiveCatalogFolder((match as any).folder_name)
                     }
-                    const pdfObjectUrl = await loadCatalogPdfBlob(match.id, match.pdf_url)
+                    const pdfObjectUrl = await loadCatalogPdfBlob(match.id, match.pdf_url, match.uploadDate)
                     if (pdfObjectUrl) {
                         setPdfUrl(pdfObjectUrl)
                         setPdfName(match.id)
@@ -3627,7 +3627,7 @@ export default function PartsCatalogViewer() {
                         setPdfUrl(blobUrl)
                         setPdfName(cat.id)
                     } else {
-                        const pdfObjectUrl = await loadCatalogPdfBlob(cat.id, cat.pdf_url)
+                        const pdfObjectUrl = await loadCatalogPdfBlob(cat.id, cat.pdf_url, cat.uploadDate)
                         if (pdfObjectUrl) {
                             setPdfUrl(pdfObjectUrl)
                             setPdfName(cat.id)
