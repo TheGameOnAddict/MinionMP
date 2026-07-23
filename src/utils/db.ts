@@ -530,6 +530,105 @@ class DbService {
             return false
         }
     }
+
+    // --- CLOUD CATALOGS CRUD & STORAGE ---
+
+    public async getCatalogsFromCloud(): Promise<Array<{ id: string; name: string; filename: string; pdf_url: string; size: number; updated_at: string }> | null> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { data, error } = await this.supabase
+                    .from('minion_catalogs')
+                    .select('*')
+                    .order('updated_at', { ascending: false })
+
+                if (error) throw error
+                return data || []
+            } catch (e) {
+                console.error('Supabase getCatalogs failed:', e)
+            }
+        }
+        return null
+    }
+
+    public async uploadCatalogToCloud(catalogId: string, catalogName: string, file: File): Promise<{ success: boolean; pdfUrl?: string }> {
+        if (this.isCloud && this.supabase) {
+            try {
+                // 1. Upload PDF file to Supabase Storage bucket 'catalogs'
+                const fileExt = file.name.split('.').pop() || 'pdf'
+                const storagePath = `${catalogId}_${Date.now()}.${fileExt}`
+
+                const { error: uploadError } = await this.supabase.storage
+                    .from('catalogs')
+                    .upload(storagePath, file, { upsert: true })
+
+                if (uploadError) {
+                    console.warn('Storage bucket upload warning (make sure bucket "catalogs" exists):', uploadError)
+                }
+
+                // Get public URL
+                const { data: urlData } = this.supabase.storage
+                    .from('catalogs')
+                    .getPublicUrl(storagePath)
+
+                const pdfUrl = urlData?.publicUrl || ''
+
+                // 2. Upsert metadata in minion_catalogs table
+                const { error: dbError } = await this.supabase
+                    .from('minion_catalogs')
+                    .upsert({
+                        id: catalogId,
+                        name: catalogName,
+                        filename: file.name,
+                        pdf_url: pdfUrl,
+                        size: file.size,
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'id'
+                    })
+
+                if (dbError) throw dbError
+                this.triggerLocalUpdate('requests')
+                return { success: true, pdfUrl }
+            } catch (e) {
+                console.error('Supabase uploadCatalogToCloud failed:', e)
+            }
+        }
+        return { success: false }
+    }
+
+    public async deleteCatalogFromCloud(catalogId: string): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_catalogs')
+                    .delete()
+                    .eq('id', catalogId)
+
+                if (error) throw error
+                this.triggerLocalUpdate('requests')
+                return true
+            } catch (e) {
+                console.error('Supabase deleteCatalogFromCloud failed:', e)
+            }
+        }
+        return false
+    }
+
+    public subscribeToCatalogs(callback: () => void): () => void {
+        if (this.isCloud && this.supabase) {
+            const channel = this.supabase
+                .channel('realtime:minion_catalogs')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'minion_catalogs' }, () => {
+                    callback()
+                })
+                .subscribe()
+
+            return () => {
+                this.supabase?.removeChannel(channel)
+            }
+        }
+        return () => {}
+    }
 }
 
 export const db = new DbService()

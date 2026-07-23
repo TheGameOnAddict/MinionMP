@@ -54,6 +54,16 @@ CREATE TABLE IF NOT EXISTS public.minion_shop_orders (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 6. Create Catalogs Metadata Table (For Shared Cloud Catalogs)
+CREATE TABLE IF NOT EXISTS public.minion_catalogs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    pdf_url TEXT NOT NULL,
+    size INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ========================================================
 -- Enable Row Level Security (RLS) & Allow Anonymous Access
 -- ========================================================
@@ -63,6 +73,7 @@ ALTER TABLE public.minion_annotations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.minion_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.minion_part_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.minion_shop_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.minion_catalogs ENABLE ROW LEVEL SECURITY;
 
 -- Allow anonymous users to SELECT, INSERT, UPDATE, DELETE
 CREATE POLICY "Public anonymous access for minion_requests" ON public.minion_requests
@@ -80,6 +91,9 @@ CREATE POLICY "Public anonymous access for minion_part_images" ON public.minion_
 CREATE POLICY "Public anonymous access for minion_shop_orders" ON public.minion_shop_orders
     FOR ALL USING (true) WITH CHECK (true);
 
+CREATE POLICY "Public anonymous access for minion_catalogs" ON public.minion_catalogs
+    FOR ALL USING (true) WITH CHECK (true);
+
 -- ========================================================
 -- Enable Supabase Realtime Replication
 -- ========================================================
@@ -88,10 +102,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_annotations;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_inventory;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_shop_orders;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.minion_catalogs;
 
 -- ========================================================
--- Storage Bucket Instructions for Image Uploads:
--- 1. Go to Supabase Dashboard -> Storage -> Create New Bucket
--- 2. Name: part-images
--- 3. Toggle "Public Bucket" to ON
+-- Storage Buckets Setup:
+-- 1. Storage -> Create Bucket -> Name: part-images (Public: ON)
+-- 2. Storage -> Create Bucket -> Name: catalogs (Public: ON)
 -- ========================================================

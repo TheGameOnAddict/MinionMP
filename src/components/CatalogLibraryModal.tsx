@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { BookOpen, Trash2, Check, X, Plus, FileText, RefreshCw, Lock } from 'lucide-react'
-import { getCatalogLibrary, CatalogMetadata, getPdfFromIndexedDb, addCatalogToLibrary, removeCatalogFromLibrary, DEFAULT_CATALOG } from '../utils/pdfStore'
+import { BookOpen, Trash2, Check, X, Plus, FileText, RefreshCw, Lock, UploadCloud } from 'lucide-react'
+import { getCatalogLibrary, fetchMergedCatalogLibrary, CatalogMetadata, getPdfFromIndexedDb, addCatalogToLibrary, removeCatalogFromLibrary, DEFAULT_CATALOG } from '../utils/pdfStore'
 import { adminStore } from '../utils/adminStore'
+import { db } from '../utils/db'
 
 interface CatalogLibraryModalProps {
     isOpen: boolean
@@ -17,10 +18,12 @@ interface CatalogCardProps {
     isAdmin: boolean
     onSelect: () => void
     onDelete: () => void
+    onUpdatePdf: (file: File) => void
 }
 
-function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete }: CatalogCardProps) {
+function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdatePdf }: CatalogCardProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const updateInputRef = useRef<HTMLInputElement>(null)
     const [loading, setLoading] = useState(true)
     const [pageCount, setPageCount] = useState<number | null>(null)
 
@@ -38,6 +41,8 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete }: Catalog
 
                 if (catalog.id === DEFAULT_CATALOG.id) {
                     doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
+                } else if (catalog.pdf_url) {
+                    doc = await pdfjsLib.getDocument(catalog.pdf_url).promise
                 } else {
                     const blob = await getPdfFromIndexedDb(catalog.id)
                     if (blob) {
@@ -78,6 +83,18 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete }: Catalog
                 isActive ? 'border-minion-500 ring-2 ring-minion-500/30' : 'border-gray-800 hover:border-gray-700'
             }`}
         >
+            {/* Hidden Input for Updating Catalog File */}
+            <input
+                ref={updateInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) onUpdatePdf(file)
+                }}
+            />
+
             {/* Active Badge */}
             {isActive && (
                 <div className="absolute top-3 left-3 bg-minion-500 text-black text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md z-10">
@@ -85,20 +102,37 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete }: Catalog
                 </div>
             )}
 
-            {/* Admin Delete Button */}
-            {isAdmin && !catalog.isDefault && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        if (confirm(`Delete "${catalog.name}" from catalog library?`)) {
-                            onDelete()
-                        }
-                    }}
-                    className="absolute top-3 right-3 p-1.5 bg-gray-900/80 hover:bg-red-500 text-gray-400 hover:text-white rounded-lg transition-colors z-10 opacity-0 group-hover:opacity-100"
-                    title="Delete Catalog"
-                >
-                    <Trash2 size={14} />
-                </button>
+            {/* Admin Action Buttons */}
+            {isAdmin && (
+                <div className="absolute top-3 right-3 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Update Catalog PDF (Preserves Annotations) */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            updateInputRef.current?.click()
+                        }}
+                        className="p-1.5 bg-gray-900/90 hover:bg-minion-500 text-gray-300 hover:text-black rounded-lg transition-colors"
+                        title="Update PDF (Preserves Notes & Annotations)"
+                    >
+                        <UploadCloud size={14} />
+                    </button>
+
+                    {/* Delete Catalog */}
+                    {!catalog.isDefault && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                if (confirm(`Delete "${catalog.name}" from catalog library?`)) {
+                                    onDelete()
+                                }
+                            }}
+                            className="p-1.5 bg-gray-900/90 hover:bg-red-500 text-gray-300 hover:text-white rounded-lg transition-colors"
+                            title="Delete Catalog"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    )}
+                </div>
             )}
 
             {/* E-book Cover Frame */}
@@ -140,16 +174,30 @@ export default function CatalogLibraryModal({
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    const refreshCatalogs = async () => {
+        const merged = await fetchMergedCatalogLibrary()
+        setCatalogs(merged)
+    }
+
     useEffect(() => {
-        const unsubscribe = adminStore.subscribe(() => {
+        const unsubscribeAdmin = adminStore.subscribe(() => {
             setIsAdmin(adminStore.getIsUnlocked())
         })
-        return unsubscribe
+
+        // Realtime subscription for cloud catalogs
+        const unsubscribeRealtime = db.subscribeToCatalogs(() => {
+            refreshCatalogs()
+        })
+
+        return () => {
+            unsubscribeAdmin()
+            unsubscribeRealtime()
+        }
     }, [])
 
     useEffect(() => {
         if (isOpen) {
-            setCatalogs(getCatalogLibrary())
+            refreshCatalogs()
         }
     }, [isOpen])
 
@@ -162,7 +210,7 @@ export default function CatalogLibraryModal({
         setUploading(true)
         try {
             const newMeta = await addCatalogToLibrary(file)
-            setCatalogs(getCatalogLibrary())
+            await refreshCatalogs()
             onSelectCatalog(newMeta)
         } catch (err) {
             console.error('Failed to upload catalog:', err)
@@ -173,11 +221,29 @@ export default function CatalogLibraryModal({
         }
     }
 
+    const handleUpdateCatalogPdf = async (catalogId: string, file: File) => {
+        setUploading(true)
+        try {
+            const targetCatalog = catalogs.find(c => c.id === catalogId)
+            const updatedMeta = await addCatalogToLibrary(file, targetCatalog?.name, catalogId)
+            await refreshCatalogs()
+            if (activeCatalogId === catalogId) {
+                onSelectCatalog(updatedMeta)
+            }
+            alert(`Updated PDF for "${targetCatalog?.name || catalogId}"! All linked notes and drawings have been preserved.`)
+        } catch (err) {
+            console.error('Failed to update catalog PDF:', err)
+            alert('Failed to update catalog PDF.')
+        } finally {
+            setUploading(false)
+        }
+    }
+
     const handleDeleteCatalog = async (id: string) => {
         await removeCatalogFromLibrary(id)
-        const updated = getCatalogLibrary()
-        setCatalogs(updated)
+        await refreshCatalogs()
 
+        const updated = getCatalogLibrary()
         if (activeCatalogId === id && updated.length > 0) {
             onSelectCatalog(updated[0])
         }
@@ -229,6 +295,7 @@ export default function CatalogLibraryModal({
                                     onClose()
                                 }}
                                 onDelete={() => handleDeleteCatalog(cat.id)}
+                                onUpdatePdf={(file) => handleUpdateCatalogPdf(cat.id, file)}
                             />
                         ))}
 
@@ -254,10 +321,10 @@ export default function CatalogLibraryModal({
                                 )}
                                 <div>
                                     <h4 className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">
-                                        {uploading ? 'Processing PDF...' : 'Upload New Catalog'}
+                                        {uploading ? 'Uploading to Supabase Cloud...' : 'Upload New Catalog'}
                                     </h4>
                                     <p className="text-[11px] text-gray-500 mt-1 max-w-[180px] leading-relaxed">
-                                        Add a new PDF manual to the library (Stored locally)
+                                        Add a new PDF manual to the cloud (Shared across all devices)
                                     </p>
                                 </div>
                             </div>

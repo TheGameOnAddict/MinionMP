@@ -1,4 +1,6 @@
-// IndexedDB storage service for multiple local PDF catalogs
+// IndexedDB & Cloud storage service for multiple PDF catalogs
+import { db } from './db'
+
 const dbName = 'MinionPdfStore'
 const storeName = 'pdf_blobs'
 const defaultKey = 'current_pdf'
@@ -9,6 +11,7 @@ export interface CatalogMetadata {
     filename: string
     size: number
     uploadDate: string
+    pdf_url?: string
     isDefault?: boolean
 }
 
@@ -73,7 +76,7 @@ export const clearPdfFromIndexedDb = (key: string = defaultKey): Promise<void> =
     })
 }
 
-// --- CATALOG LIBRARY HELPERS ---
+// --- CATALOG LIBRARY HELPERS (LOCAL + CLOUD) ---
 
 export const getCatalogLibrary = (): CatalogMetadata[] => {
     const local = localStorage.getItem('minion_catalog_library')
@@ -88,20 +91,54 @@ export const getCatalogLibrary = (): CatalogMetadata[] => {
     return [DEFAULT_CATALOG]
 }
 
-export const addCatalogToLibrary = async (file: File, customName?: string): Promise<CatalogMetadata> => {
-    const id = `catalog_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> => {
+    const localList = getCatalogLibrary()
+    const cloudCatalogs = await db.getCatalogsFromCloud()
+
+    if (cloudCatalogs && cloudCatalogs.length > 0) {
+        const cloudMetas: CatalogMetadata[] = cloudCatalogs.map(c => ({
+            id: c.id,
+            name: c.name,
+            filename: c.filename,
+            pdf_url: c.pdf_url,
+            size: c.size,
+            uploadDate: new Date(c.updated_at).toLocaleDateString()
+        }))
+
+        // Merge cloud catalogs with default sample catalog
+        const map = new Map<string, CatalogMetadata>()
+        map.set(DEFAULT_CATALOG.id, DEFAULT_CATALOG)
+        cloudMetas.forEach(c => map.set(c.id, c))
+        localList.forEach(c => { if (!map.has(c.id)) map.set(c.id, c) })
+
+        const merged = Array.from(map.values())
+        localStorage.setItem('minion_catalog_library', JSON.stringify(merged))
+        return merged
+    }
+
+    return localList
+}
+
+export const addCatalogToLibrary = async (file: File, customName?: string, targetId?: string): Promise<CatalogMetadata> => {
+    const id = targetId || `catalog_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const catalogName = customName || file.name.replace(/\.pdf$/i, '')
+
+    // 1. Upload to Supabase Cloud if active
+    const cloudRes = await db.uploadCatalogToCloud(id, catalogName, file)
+
     const meta: CatalogMetadata = {
         id,
-        name: customName || file.name.replace(/\.pdf$/i, ''),
+        name: catalogName,
         filename: file.name,
         size: file.size,
+        pdf_url: cloudRes.pdfUrl,
         uploadDate: new Date().toLocaleDateString()
     }
 
-    // Save blob to IndexedDB under catalog id
+    // 2. Save blob to IndexedDB under catalog id (for fast local caching)
     await savePdfToIndexedDb(file, id)
 
-    // Save catalog metadata list
+    // 3. Save catalog metadata list locally
     const currentList = getCatalogLibrary()
     const updated = [meta, ...currentList.filter(c => c.id !== id)]
     localStorage.setItem('minion_catalog_library', JSON.stringify(updated))
@@ -112,7 +149,9 @@ export const addCatalogToLibrary = async (file: File, customName?: string): Prom
 export const removeCatalogFromLibrary = async (catalogId: string): Promise<void> => {
     if (catalogId === DEFAULT_CATALOG.id) return
 
+    await db.deleteCatalogFromCloud(catalogId)
     await clearPdfFromIndexedDb(catalogId)
+
     const currentList = getCatalogLibrary()
     const updated = currentList.filter(c => c.id !== catalogId)
     localStorage.setItem('minion_catalog_library', JSON.stringify(updated))
