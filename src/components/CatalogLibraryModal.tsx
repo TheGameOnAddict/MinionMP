@@ -100,6 +100,7 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                 type="file"
                 accept=".pdf"
                 className="hidden"
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (file) {
