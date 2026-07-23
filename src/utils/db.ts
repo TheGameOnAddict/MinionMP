@@ -1,0 +1,535 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+
+export interface RequestLineItem {
+    id: string
+    raw: string
+    part_number: string
+    nomenclature: string
+    qty: string | number
+    original_qty: string | number
+    qtyUnit?: string
+    group: string
+    status: string // New, Picked, Partial Stock, On Order, Fulfilled, Canceled
+    filled_qty?: string | number
+    requested_changes?: string
+}
+
+export interface PartsRequest {
+    id: string
+    mechanic: string
+    tail: string
+    discrepancy: string
+    status: string // New, Processing, Ready, Picked, etc.
+    items: RequestLineItem[]
+    timestamp: string
+}
+
+export interface PDFAnnotation {
+    type: 'rect' | 'circle' | 'pen' | 'text' | 'part_box'
+    id: string
+    pageNumber: number
+    color: string
+    thickness?: number
+    points?: { x: number; y: number }[] // For pen drawing
+    // Bounding box for rect, circle, text, part_box
+    x?: number
+    y?: number
+    width?: number
+    height?: number
+    text?: string // For notes/sticky text or part_box part number
+    nomenclature?: string // For part_box nomenclature
+    qty?: string | number // For part_box qty
+}
+
+export interface InventoryItem {
+    part_number: string
+    nomenclature?: string
+    qty_available: number
+    location?: string
+    unit?: string
+    updated_at?: string
+}
+
+export interface PartImage {
+    id?: number
+    part_number: string
+    image_url: string
+    created_at?: string
+}
+
+export interface ShopOrder {
+    id: string
+    title: string
+    tail?: string
+    mechanic?: string
+    status: string
+    created_at?: string
+}
+
+class DbService {
+    private supabase: SupabaseClient | null = null
+    private url: string | null = null
+    private key: string | null = null
+    private isCloud = false
+
+    constructor() {
+        this.initialize()
+    }
+
+    public initialize() {
+        const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL
+        const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY
+
+        this.url = localStorage.getItem('minion_supabase_url') || (envUrl && envUrl !== 'https://your-project-id.supabase.co' ? envUrl : null)
+        this.key = localStorage.getItem('minion_supabase_key') || (envKey && envKey !== 'your-anon-public-key-here' ? envKey : null)
+
+        if (this.url && this.key) {
+            try {
+                this.supabase = createClient(this.url, this.key)
+                this.isCloud = true
+                console.log('MinionMP: Supabase connected successfully.')
+            } catch (err) {
+                console.error('MinionMP: Failed to connect to Supabase, falling back to Local Storage.', err)
+                this.supabase = null
+                this.isCloud = false
+            }
+        } else {
+            this.supabase = null
+            this.isCloud = false
+            console.log('MinionMP: Operating in Local Mode (localStorage).')
+        }
+    }
+
+    public getConfig() {
+        return {
+            url: this.url || '',
+            key: this.key || '',
+            isCloud: this.isCloud
+        }
+    }
+
+    public setConfig(url: string, key: string) {
+        if (url.trim() && key.trim()) {
+            localStorage.setItem('minion_supabase_url', url.trim())
+            localStorage.setItem('minion_supabase_key', key.trim())
+        } else {
+            localStorage.removeItem('minion_supabase_url')
+            localStorage.removeItem('minion_supabase_key')
+        }
+        this.initialize()
+    }
+
+    // --- REQUESTS CRUD ---
+
+    public async getRequests(): Promise<PartsRequest[]> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { data, error } = await this.supabase
+                    .from('minion_requests')
+                    .select('*')
+                    .order('timestamp', { ascending: false })
+
+                if (error) throw error
+                return (data || []).map(row => ({
+                    id: row.id,
+                    mechanic: row.mechanic,
+                    tail: row.tail,
+                    discrepancy: row.discrepancy,
+                    status: row.status,
+                    items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items,
+                    timestamp: row.timestamp
+                }))
+            } catch (e) {
+                console.error('Supabase getRequests failed, falling back to localStorage:', e)
+            }
+        }
+
+        // Local Fallback
+        const localData = localStorage.getItem('minion_requests')
+        if (localData) {
+            try {
+                const reqs = JSON.parse(localData) as PartsRequest[]
+                // sort desc
+                return reqs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            } catch (e) {
+                console.error(e)
+            }
+        }
+        return []
+    }
+
+    public async saveRequest(req: Omit<PartsRequest, 'timestamp'> & { timestamp?: string }): Promise<{ success: boolean; id: string }> {
+        const fullReq: PartsRequest = {
+            ...req,
+            timestamp: req.timestamp || new Date().toISOString()
+        }
+
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_requests')
+                    .insert({
+                        id: fullReq.id,
+                        mechanic: fullReq.mechanic,
+                        tail: fullReq.tail,
+                        discrepancy: fullReq.discrepancy,
+                        status: fullReq.status,
+                        items: fullReq.items
+                    })
+
+                if (error) throw error
+                this.triggerLocalUpdate()
+                return { success: true, id: fullReq.id }
+            } catch (e) {
+                console.error('Supabase saveRequest failed, saving to localStorage fallback:', e)
+            }
+        }
+
+        // Local Storage
+        const requests = await this.getRequests()
+        requests.push(fullReq)
+        localStorage.setItem('minion_requests', JSON.stringify(requests))
+        this.triggerLocalUpdate()
+        return { success: true, id: fullReq.id }
+    }
+
+    public async updateRequestStatus(requestId: string, status: string): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_requests')
+                    .update({ status })
+                    .eq('id', requestId)
+
+                if (error) throw error
+                this.triggerLocalUpdate()
+                return true
+            } catch (e) {
+                console.error('Supabase updateRequestStatus failed:', e)
+            }
+        }
+
+        // Local Storage
+        const requests = await this.getRequests()
+        const index = requests.findIndex(r => r.id === requestId)
+        if (index !== -1) {
+            requests[index].status = status
+            localStorage.setItem('minion_requests', JSON.stringify(requests))
+            this.triggerLocalUpdate()
+            return true
+        }
+        return false
+    }
+
+    public async updateRequest(req: PartsRequest): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_requests')
+                    .update({
+                        mechanic: req.mechanic,
+                        tail: req.tail,
+                        discrepancy: req.discrepancy,
+                        status: req.status,
+                        items: req.items
+                    })
+                    .eq('id', req.id)
+
+                if (error) throw error
+                this.triggerLocalUpdate()
+                return true
+            } catch (e) {
+                console.error('Supabase updateRequest failed:', e)
+            }
+        }
+
+        // Local Storage
+        const requests = await this.getRequests()
+        const index = requests.findIndex(r => r.id === req.id)
+        if (index !== -1) {
+            requests[index] = req
+            localStorage.setItem('minion_requests', JSON.stringify(requests))
+            this.triggerLocalUpdate()
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Finds the request containing a line item and updates that line item
+     */
+    public async updateLineItem(lineId: string, updater: (item: RequestLineItem) => RequestLineItem): Promise<boolean> {
+        const requests = await this.getRequests()
+        let foundReq: PartsRequest | null = null
+
+        for (const req of requests) {
+            const itemIdx = req.items.findIndex(i => i.id === lineId)
+            if (itemIdx !== -1) {
+                req.items[itemIdx] = updater(req.items[itemIdx])
+                foundReq = req
+                break
+            }
+        }
+
+        if (foundReq) {
+            return this.updateRequest(foundReq)
+        }
+        return false
+    }
+
+    // --- ANNOTATIONS CRUD ---
+
+    public async getAnnotations(pdfId: string, pageNumber: number): Promise<PDFAnnotation[]> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { data, error } = await this.supabase
+                    .from('minion_annotations')
+                    .select('shapes, notes')
+                    .eq('pdf_id', pdfId)
+                    .eq('page_number', pageNumber)
+                    .maybeSingle()
+
+                if (error) throw error
+                if (data) {
+                    const shapes = typeof data.shapes === 'string' ? JSON.parse(data.shapes) : data.shapes
+                    const notes = typeof data.notes === 'string' ? JSON.parse(data.notes) : data.notes
+                    return [...(shapes || []), ...(notes || [])]
+                }
+            } catch (e) {
+                console.error('Supabase getAnnotations failed, fallback to local:', e)
+            }
+        }
+
+        // Local fallback
+        const localKey = `minion_anno_${pdfId}_${pageNumber}`
+        const localData = localStorage.getItem(localKey)
+        if (localData) {
+            try {
+                return JSON.parse(localData) as PDFAnnotation[]
+            } catch (e) {
+                console.error(e)
+            }
+        }
+        return []
+    }
+
+    public async saveAnnotations(pdfId: string, pageNumber: number, annotations: PDFAnnotation[]): Promise<boolean> {
+        const shapes = annotations.filter(a => a.type !== 'text')
+        const notes = annotations.filter(a => a.type === 'text')
+
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_annotations')
+                    .upsert({
+                        pdf_id: pdfId,
+                        page_number: pageNumber,
+                        shapes,
+                        notes,
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'pdf_id,page_number'
+                    })
+
+                if (error) throw error
+                this.triggerLocalUpdate('annotations')
+                return true
+            } catch (e) {
+                console.error('Supabase saveAnnotations failed, fallback to local:', e)
+            }
+        }
+
+        // Local fallback
+        const localKey = `minion_anno_${pdfId}_${pageNumber}`
+        localStorage.setItem(localKey, JSON.stringify(annotations))
+        this.triggerLocalUpdate('annotations')
+        return true
+    }
+
+    // --- REALTIME SUBSCRIPTIONS ---
+
+    public subscribeToRequests(callback: () => void): () => void {
+        if (this.isCloud && this.supabase) {
+            const channel = this.supabase
+                .channel('realtime:minion_requests')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'minion_requests' }, () => {
+                    callback()
+                })
+                .subscribe()
+
+            // Return unsubscribe cleanup function
+            return () => {
+                this.supabase?.removeChannel(channel)
+            }
+        }
+
+        // Local fallback listener
+        const handleLocalChange = (e: Event) => {
+            if ((e as CustomEvent).detail?.type === 'requests') {
+                callback()
+            }
+        }
+        window.addEventListener('minion_db_update', handleLocalChange)
+        return () => {
+            window.removeEventListener('minion_db_update', handleLocalChange)
+        }
+    }
+
+    public subscribeToAnnotations(callback: () => void): () => void {
+        if (this.isCloud && this.supabase) {
+            const channel = this.supabase
+                .channel('realtime:minion_annotations')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'minion_annotations' }, () => {
+                    callback()
+                })
+                .subscribe()
+
+            return () => {
+                this.supabase?.removeChannel(channel)
+            }
+        }
+
+        const handleLocalChange = (e: Event) => {
+            if ((e as CustomEvent).detail?.type === 'annotations') {
+                callback()
+            }
+        }
+        window.addEventListener('minion_db_update', handleLocalChange)
+        return () => {
+            window.removeEventListener('minion_db_update', handleLocalChange)
+        }
+    }
+
+    public async renamePdfId(oldId: string, newId: string): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_annotations')
+                    .update({ pdf_id: newId })
+                    .eq('pdf_id', oldId)
+
+                if (error) throw error
+                this.triggerLocalUpdate('annotations')
+                return true
+            } catch (e) {
+                console.error('Supabase renamePdfId failed:', e)
+            }
+        }
+        return false
+    }
+
+    public async deleteAnnotationsForPdf(pdfId: string): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_annotations')
+                    .delete()
+                    .eq('pdf_id', pdfId)
+
+                if (error) throw error
+                this.triggerLocalUpdate('annotations')
+                return true
+            } catch (e) {
+                console.error('Supabase deleteAnnotationsForPdf failed:', e)
+            }
+        }
+        return false
+    }
+
+    private triggerLocalUpdate(type: 'requests' | 'annotations' = 'requests') {
+        const event = new CustomEvent('minion_db_update', { detail: { type } })
+        window.dispatchEvent(event)
+    }
+
+    // --- DATABASE BACKUP / IMPORT / EXPORT ---
+
+    public async exportDbJson(): Promise<string> {
+        const requests = await this.getRequests()
+        
+        // Grab all annotations from localStorage since we don't dump all Supabase ones here (but we can bundle localStorage ones)
+        const annotations: Record<string, any> = {}
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i)
+            if (key && key.startsWith('minion_anno_')) {
+                const data = localStorage.getItem(key)
+                if (data) {
+                    annotations[key] = JSON.parse(data)
+                }
+            }
+        }
+
+        const payload = {
+            version: 'minionmp-0.0.1',
+            timestamp: new Date().toISOString(),
+            requests,
+            annotations
+        }
+
+        return JSON.stringify(payload, null, 2)
+    }
+
+    public async importDbJson(jsonString: string): Promise<boolean> {
+        try {
+            const payload = JSON.parse(jsonString)
+            if (!payload || payload.version !== 'minionmp-0.0.1') {
+                alert('Invalid database backup file.')
+                return false
+            }
+
+            // Save requests
+            if (Array.isArray(payload.requests)) {
+                if (this.isCloud && this.supabase) {
+                    for (const req of payload.requests) {
+                        await this.supabase.from('minion_requests').upsert({
+                            id: req.id,
+                            mechanic: req.mechanic,
+                            tail: req.tail,
+                            discrepancy: req.discrepancy,
+                            status: req.status,
+                            items: req.items,
+                            timestamp: req.timestamp
+                        })
+                    }
+                } else {
+                    localStorage.setItem('minion_requests', JSON.stringify(payload.requests))
+                }
+            }
+
+            // Save annotations
+            if (payload.annotations && typeof payload.annotations === 'object') {
+                for (const [key, list] of Object.entries(payload.annotations)) {
+                    if (this.isCloud && this.supabase) {
+                        // key is e.g. minion_anno_filename_5
+                        const parts = key.split('_')
+                        const pageNumber = parseInt(parts.pop() || '0', 10)
+                        const pdfId = parts.slice(2).join('_')
+                        if (pdfId && pageNumber > 0 && Array.isArray(list)) {
+                            const shapes = list.filter((a: any) => a.type !== 'text')
+                            const notes = list.filter((a: any) => a.type === 'text')
+                            await this.supabase.from('minion_annotations').upsert({
+                                pdf_id: pdfId,
+                                page_number: pageNumber,
+                                shapes,
+                                notes,
+                                updated_at: new Date().toISOString()
+                            }, {
+                                onConflict: 'pdf_id,page_number'
+                            })
+                        }
+                    } else {
+                        localStorage.setItem(key, JSON.stringify(list))
+                    }
+                }
+            }
+
+            this.triggerLocalUpdate('requests')
+            this.triggerLocalUpdate('annotations')
+            return true
+        } catch (e) {
+            console.error('Import failed:', e)
+            return false
+        }
+    }
+}
+
+export const db = new DbService()
