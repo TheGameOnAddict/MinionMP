@@ -233,6 +233,45 @@ function PageCarouselThumbnail({ pdfDoc, pageNum, active, onClick }: { pdfDoc: a
     )
 }
 
+function PrintPagePreviewThumbnail({ pdfDoc, pageNum }: { pdfDoc: any; pageNum: number }) {
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        let isSubscribed = true
+        if (pdfDoc && pageNum > 0) {
+            const render = async () => {
+                try {
+                    const page = await pdfDoc.getPage(pageNum)
+                    const viewport = page.getViewport({ scale: 0.25 })
+                    const canvas = canvasRef.current
+                    if (!canvas) return
+                    canvas.width = viewport.width
+                    canvas.height = viewport.height
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) return
+                    await page.render({ canvasContext: ctx, viewport }).promise
+                    if (isSubscribed) setLoading(false)
+                } catch (e) {
+                    console.error(e)
+                }
+            }
+            render()
+        }
+        return () => { isSubscribed = false }
+    }, [pdfDoc, pageNum])
+
+    return (
+        <div className="flex flex-col items-center bg-gray-950 p-1.5 rounded-lg border border-gray-800 shrink-0 select-none">
+            <div className="relative w-16 h-20 bg-gray-900 rounded overflow-hidden flex items-center justify-center border border-gray-800">
+                {loading && <RefreshCw size={12} className="animate-spin text-minion-400 absolute" />}
+                <canvas ref={canvasRef} className="block max-w-full max-h-full" />
+            </div>
+            <span className="text-[10px] font-bold font-mono text-minion-450 mt-1">Pg {pageNum}</span>
+        </div>
+    )
+}
+
 // Helper component for auto-marquee scrolling text of dynamic length
 interface AutoMarqueeTextProps {
     text: string
@@ -3436,10 +3475,39 @@ export default function PartsCatalogViewer() {
                             </div>
                         </div>
 
+                        {/* Live Selected Pages Preview Carousel */}
+                        {(() => {
+                            const previewPages = printMode === 'current' 
+                                ? [pageNumber] 
+                                : printMode === 'all' 
+                                    ? Array.from({ length: numPages }, (_, i) => i + 1) 
+                                    : parsePageRange(printPageRange, numPages)
+                            return (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400">
+                                        <span>Selected Pages Preview ({previewPages.length} {previewPages.length === 1 ? 'Page' : 'Pages'})</span>
+                                        <span className="text-[10px] text-minion-450 font-mono">Live PDF Previews</span>
+                                    </div>
+                                    <div className="flex items-center gap-2.5 overflow-x-auto p-2.5 bg-gray-950/70 border border-gray-800 rounded-xl custom-scrollbar min-h-[110px]">
+                                        {previewPages.length === 0 ? (
+                                            <div className="text-xs text-gray-500 italic p-3 text-center w-full">Enter a valid page range above to preview...</div>
+                                        ) : (
+                                            previewPages.slice(0, 25).map(pg => (
+                                                <PrintPagePreviewThumbnail key={pg} pdfDoc={pdfDoc} pageNum={pg} />
+                                            ))
+                                        )}
+                                        {previewPages.length > 25 && (
+                                            <div className="text-xs text-gray-500 font-bold p-3 shrink-0">+{previewPages.length - 25} more pages</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })()}
+
                         {/* Stamp Header Preview Info */}
                         <div className="bg-gray-950/70 border border-gray-800 rounded-xl p-3 text-[11px] text-gray-400 space-y-1">
                             <div className="font-bold text-gray-300 flex items-center gap-1.5">
-                                <span>📄 Header Stamp Format:</span>
+                                <span>📄 Header Stamp Format (Overlaid Top Right):</span>
                             </div>
                             <div className="font-mono text-minion-450 text-[10px]">
                                 {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, FOR REFERENCE ONLY
@@ -3506,6 +3574,8 @@ export default function PartsCatalogViewer() {
                         .print-page-card {
                             page-break-after: always !important;
                             break-after: page !important;
+                            page-break-inside: avoid !important;
+                            break-inside: avoid !important;
                             position: relative !important;
                             width: 100% !important;
                             margin: 0 auto !important;
@@ -3531,10 +3601,13 @@ export default function PartsCatalogViewer() {
                     const now = new Date()
                     const timestampStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, FOR REFERENCE ONLY`
                     return (
-                        <div key={pIdx} className="print-page-card bg-white text-black font-sans p-1">
-                            {/* Custom Header Stamp: Top Right Date/Time, FOR REFERENCE ONLY */}
-                            <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2 text-[11px] font-mono text-gray-800">
-                                <div className="font-bold tracking-wide text-gray-900">
+                        <div key={pIdx} className="print-page-card relative bg-white text-black font-sans w-full border border-gray-300 overflow-hidden" style={{ aspectRatio: `${p.width} / ${p.height}` }}>
+                            {/* Page Canvas Image */}
+                            <img src={p.canvasUrl} className="block w-full h-full object-contain" alt={`Page ${p.pageNum}`} />
+
+                            {/* Custom Header Stamp: Overlaid Top Right Inside Page */}
+                            <div className="absolute top-2 left-3 right-3 flex items-center justify-between z-10 pointer-events-none bg-white/90 backdrop-blur-xs px-3 py-1 rounded border border-gray-400 text-[10px] font-mono text-gray-900 shadow-sm">
+                                <div className="font-bold tracking-wide">
                                     {(pdfName || 'MINION PARTS CATALOG').toUpperCase()} — PAGE {p.pageNum}
                                 </div>
                                 <div className="font-bold text-gray-900">
@@ -3542,143 +3615,138 @@ export default function PartsCatalogViewer() {
                                 </div>
                             </div>
 
-                            {/* Page Canvas Container */}
-                            <div className="relative border border-gray-300 bg-white inline-block overflow-hidden w-full" style={{ aspectRatio: `${p.width} / ${p.height}` }}>
-                                <img src={p.canvasUrl} className="block w-full h-full object-contain" alt={`Page ${p.pageNum}`} />
+                            {/* Highlights */}
+                            {p.overlays.map((ov, oIdx) => (
+                                <div key={oIdx} className="absolute inset-0 pointer-events-none" style={{ zIndex: 2 }}>
+                                    {ov.rects.map((r, rIdx) => (
+                                        <div
+                                            key={rIdx}
+                                            className="absolute"
+                                            style={{
+                                                left: `${r.x * 100}%`,
+                                                top: `${r.y * 100}%`,
+                                                width: `${r.w * 100}%`,
+                                                height: `${r.h * 100}%`,
+                                                background: 'rgba(255, 210, 10, 0.4)',
+                                                borderRadius: 2,
+                                                mixBlendMode: 'multiply'
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            ))}
 
-                                {/* Highlights */}
-                                {p.overlays.map((ov, oIdx) => (
-                                    <div key={oIdx} className="absolute inset-0 pointer-events-none" style={{ zIndex: 2 }}>
-                                        {ov.rects.map((r, rIdx) => (
-                                            <div
-                                                key={rIdx}
-                                                className="absolute"
-                                                style={{
-                                                    left: `${r.x * 100}%`,
-                                                    top: `${r.y * 100}%`,
-                                                    width: `${r.w * 100}%`,
-                                                    height: `${r.h * 100}%`,
-                                                    background: 'rgba(255, 210, 10, 0.4)',
-                                                    borderRadius: 2,
-                                                    mixBlendMode: 'multiply'
-                                                }}
+                            {/* Annotations */}
+                            <svg
+                                viewBox={`0 0 ${p.width} ${p.height}`}
+                                className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                                style={{ zIndex: 3 }}
+                            >
+                                {p.annotations.map(anno => {
+                                    if (anno.type === 'rect' && anno.x !== undefined && anno.y !== undefined) {
+                                        return (
+                                            <rect
+                                                key={anno.id}
+                                                x={anno.x * p.width}
+                                                y={anno.y * p.height}
+                                                width={(anno.width || 0) * p.width}
+                                                height={(anno.height || 0) * p.height}
+                                                fill="none"
+                                                stroke={anno.color}
+                                                strokeWidth={anno.thickness || 3}
                                             />
-                                        ))}
-                                    </div>
-                                ))}
-
-                                {/* Annotations */}
-                                <svg
-                                    viewBox={`0 0 ${p.width} ${p.height}`}
-                                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                                    style={{ zIndex: 3 }}
-                                >
-                                    {p.annotations.map(anno => {
-                                        if (anno.type === 'rect' && anno.x !== undefined && anno.y !== undefined) {
-                                            return (
+                                        )
+                                    }
+                                    if (anno.type === 'circle' && anno.x !== undefined && anno.y !== undefined) {
+                                        const rx = ((anno.width || 0) * p.width) / 2
+                                        const ry = ((anno.height || 0) * p.height) / 2
+                                        const cx = (anno.x * p.width) + rx
+                                        const cy = (anno.y * p.height) + ry
+                                        return (
+                                            <ellipse
+                                                key={anno.id}
+                                                cx={cx}
+                                                cy={cy}
+                                                rx={rx}
+                                                ry={ry}
+                                                fill="none"
+                                                stroke={anno.color}
+                                                strokeWidth={anno.thickness || 3}
+                                            />
+                                        )
+                                    }
+                                    if (anno.type === 'pen' && anno.points && anno.points.length > 1) {
+                                        const pathData = anno.points.reduce((acc, pt, i) => {
+                                            const px = pt.x * p.width
+                                            const py = pt.y * p.height
+                                            return i === 0 ? `M ${px} ${py}` : `${acc} L ${px} ${py}`
+                                        }, '')
+                                        return (
+                                            <path
+                                                key={anno.id}
+                                                d={pathData}
+                                                fill="none"
+                                                stroke={anno.color}
+                                                strokeWidth={anno.thickness || 3}
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
+                                        )
+                                    }
+                                    if (anno.type === 'part_box' && anno.x !== undefined && anno.y !== undefined) {
+                                        return (
+                                            <g key={anno.id}>
                                                 <rect
-                                                    key={anno.id}
                                                     x={anno.x * p.width}
                                                     y={anno.y * p.height}
                                                     width={(anno.width || 0) * p.width}
                                                     height={(anno.height || 0) * p.height}
-                                                    fill="none"
-                                                    stroke={anno.color}
-                                                    strokeWidth={anno.thickness || 3}
+                                                    fill="rgba(52, 199, 89, 0.15)"
+                                                    stroke="#34c759"
+                                                    strokeWidth={2}
                                                 />
-                                            )
-                                        }
-                                        if (anno.type === 'circle' && anno.x !== undefined && anno.y !== undefined) {
-                                            const rx = ((anno.width || 0) * p.width) / 2
-                                            const ry = ((anno.height || 0) * p.height) / 2
-                                            const cx = (anno.x * p.width) + rx
-                                            const cy = (anno.y * p.height) + ry
-                                            return (
-                                                <ellipse
-                                                    key={anno.id}
-                                                    cx={cx}
-                                                    cy={cy}
-                                                    rx={rx}
-                                                    ry={ry}
-                                                    fill="none"
-                                                    stroke={anno.color}
-                                                    strokeWidth={anno.thickness || 3}
-                                                />
-                                            )
-                                        }
-                                        if (anno.type === 'pen' && anno.points && anno.points.length > 1) {
-                                            const pathData = anno.points.reduce((acc, pt, i) => {
-                                                const px = pt.x * p.width
-                                                const py = pt.y * p.height
-                                                return i === 0 ? `M ${px} ${py}` : `${acc} L ${px} ${py}`
-                                            }, '')
-                                            return (
-                                                <path
-                                                    key={anno.id}
-                                                    d={pathData}
-                                                    fill="none"
-                                                    stroke={anno.color}
-                                                    strokeWidth={anno.thickness || 3}
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                />
-                                            )
-                                        }
-                                        if (anno.type === 'part_box' && anno.x !== undefined && anno.y !== undefined) {
-                                            return (
-                                                <g key={anno.id}>
-                                                    <rect
-                                                        x={anno.x * p.width}
-                                                        y={anno.y * p.height}
-                                                        width={(anno.width || 0) * p.width}
-                                                        height={(anno.height || 0) * p.height}
-                                                        fill="rgba(52, 199, 89, 0.15)"
-                                                        stroke="#34c759"
-                                                        strokeWidth={2}
-                                                    />
-                                                    {anno.text && (
-                                                        <text
-                                                            x={anno.x * p.width + 4}
-                                                            y={anno.y * p.height + 14}
-                                                            fill="#000"
-                                                            fontSize={11}
-                                                            fontWeight="bold"
-                                                        >
-                                                            {anno.text}
-                                                        </text>
-                                                    )}
-                                                </g>
-                                            )
-                                        }
-                                        if (anno.type === 'text' && anno.x !== undefined && anno.y !== undefined) {
-                                            return (
-                                                <g key={anno.id}>
-                                                    <rect
-                                                        x={anno.x * p.width}
-                                                        y={anno.y * p.height}
-                                                        width={140}
-                                                        height={40}
-                                                        fill="#fef08a"
-                                                        stroke="#ca8a04"
-                                                        strokeWidth={1}
-                                                        rx={4}
-                                                    />
+                                                {anno.text && (
                                                     <text
-                                                        x={anno.x * p.width + 6}
-                                                        y={anno.y * p.height + 18}
-                                                        fill="#854d0e"
-                                                        fontSize={10}
+                                                        x={anno.x * p.width + 4}
+                                                        y={anno.y * p.height + 14}
+                                                        fill="#000"
+                                                        fontSize={11}
                                                         fontWeight="bold"
                                                     >
-                                                        {anno.text || ''}
+                                                        {anno.text}
                                                     </text>
-                                                </g>
-                                            )
-                                        }
-                                        return null
-                                    })}
-                                </svg>
-                            </div>
+                                                )}
+                                            </g>
+                                        )
+                                    }
+                                    if (anno.type === 'text' && anno.x !== undefined && anno.y !== undefined) {
+                                        return (
+                                            <g key={anno.id}>
+                                                <rect
+                                                    x={anno.x * p.width}
+                                                    y={anno.y * p.height}
+                                                    width={140}
+                                                    height={40}
+                                                    fill="#fef08a"
+                                                    stroke="#ca8a04"
+                                                    strokeWidth={1}
+                                                    rx={4}
+                                                />
+                                                <text
+                                                    x={anno.x * p.width + 6}
+                                                    y={anno.y * p.height + 18}
+                                                    fill="#854d0e"
+                                                    fontSize={10}
+                                                    fontWeight="bold"
+                                                >
+                                                    {anno.text || ''}
+                                                </text>
+                                            </g>
+                                        )
+                                    }
+                                    return null
+                                })}
+                            </svg>
                         </div>
                     )
                 })}
