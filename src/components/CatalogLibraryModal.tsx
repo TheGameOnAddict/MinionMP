@@ -8,7 +8,7 @@ interface CatalogLibraryModalProps {
     isOpen: boolean
     activeCatalogId: string
     onClose: () => void
-    onSelectCatalog: (catalog: CatalogMetadata) => void
+    onSelectCatalog: (catalog: CatalogMetadata, blobUrl?: string) => void
     onRequestAdminUnlock?: () => void
 }
 
@@ -38,7 +38,8 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                     return
                 }
                 let doc: any = null
-                // 1. Try local IndexedDB blob first
+
+                // Try local IndexedDB blob first
                 if (catalog.id !== DEFAULT_CATALOG.id) {
                     try {
                         const blob = await getPdfFromIndexedDb(catalog.id)
@@ -46,22 +47,17 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                             const arrayBuffer = await blob.arrayBuffer()
                             doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
                         }
-                    } catch (e) {}
+                    } catch (e) { /* ignore */ }
                 }
 
-                // 2. Try fetching cloud pdf_url as ArrayBuffer
+                // Try cloud URL
                 if (!doc && catalog.pdf_url) {
                     try {
-                        const cleanUrl = catalog.pdf_url.split('#')[0]
-                        const response = await fetch(cleanUrl, { cache: 'reload' })
-                        if (response.ok) {
-                            const arrayBuffer = await response.arrayBuffer()
-                            doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-                        }
-                    } catch (e) {}
+                        doc = await pdfjsLib.getDocument(catalog.pdf_url).promise
+                    } catch (e) { /* ignore */ }
                 }
 
-                // 3. Fallback to static default
+                // Fallback to default sample
                 if (!doc) {
                     doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
                 }
@@ -120,21 +116,34 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                 </div>
             )}
 
-            {/* Admin Action Buttons (Top Right Badge) */}
+            {/* Admin Action Buttons — hover reveal */}
             {isAdmin && (
-                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
+                <div className="absolute top-3 right-3 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Update Catalog PDF (Preserves Annotations) */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            updateInputRef.current?.click()
+                        }}
+                        className="p-1.5 bg-gray-900/90 hover:bg-minion-500 text-gray-300 hover:text-black rounded-lg transition-colors"
+                        title="Update PDF (Preserves Notes & Annotations)"
+                    >
+                        <UploadCloud size={14} />
+                    </button>
+
+                    {/* Delete Catalog */}
                     {!catalog.isDefault && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation()
-                                if (confirm(`Delete "${catalog.name}" from catalog library and cloud storage?`)) {
+                                if (confirm(`Delete "${catalog.name}" from catalog library?`)) {
                                     onDelete()
                                 }
                             }}
-                            className="p-1.5 bg-red-600/90 hover:bg-red-500 text-white rounded-lg transition-colors shadow-md cursor-pointer"
+                            className="p-1.5 bg-gray-900/90 hover:bg-red-500 text-gray-300 hover:text-white rounded-lg transition-colors"
                             title="Delete Catalog"
                         >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                         </button>
                     )}
                 </div>
@@ -151,7 +160,7 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
             </div>
 
             {/* Catalog Info */}
-            <div className="w-full text-center space-y-1 mb-2">
+            <div className="w-full text-center space-y-1">
                 <h4 className="text-sm font-bold text-gray-100 group-hover:text-minion-400 transition-colors truncate px-1">
                     {catalog.name}
                 </h4>
@@ -163,21 +172,6 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                     <span>{(catalog.size / (1024 * 1024)).toFixed(1)} MB</span>
                 </div>
             </div>
-
-            {/* Admin Replace PDF Button (Always Visible) */}
-            {isAdmin && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        updateInputRef.current?.click()
-                    }}
-                    className="w-full mt-2 py-1.5 bg-minion-500/15 hover:bg-minion-500 text-minion-400 hover:text-black border border-minion-500/40 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer"
-                    title="Upload a new PDF file for this catalog while keeping all notes & drawings attached"
-                >
-                    <UploadCloud size={13} />
-                    <span>Replace PDF (Keep Notes)</span>
-                </button>
-            )}
         </div>
     )
 }
@@ -231,7 +225,10 @@ export default function CatalogLibraryModal({
         try {
             const newMeta = await addCatalogToLibrary(file)
             await refreshCatalogs()
-            onSelectCatalog(newMeta)
+            // Create a direct blob URL from the raw file so the viewer loads it immediately
+            const blobUrl = URL.createObjectURL(file)
+            onSelectCatalog(newMeta, blobUrl)
+            onClose()
         } catch (err) {
             console.error('Failed to upload catalog:', err)
             alert('Failed to save catalog PDF.')
@@ -249,11 +246,11 @@ export default function CatalogLibraryModal({
             localStorage.removeItem(`pdf_metadata_v3_${catalogId}`)
 
             const updatedMeta = await addCatalogToLibrary(file, targetCatalog?.name, catalogId)
-            if (updatedMeta.pdf_url) {
-                updatedMeta.pdf_url = `${updatedMeta.pdf_url}?t=${Date.now()}`
-            }
             await refreshCatalogs()
-            onSelectCatalog(updatedMeta)
+
+            // Create a direct blob URL from the raw File object — bypasses ALL caching
+            const blobUrl = URL.createObjectURL(file)
+            onSelectCatalog(updatedMeta, blobUrl)
             onClose()
             alert(`Updated PDF for "${targetCatalog?.name || catalogId}"! All linked notes and drawings have been preserved.`)
         } catch (err) {

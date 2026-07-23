@@ -553,9 +553,25 @@ class DbService {
     public async uploadCatalogToCloud(catalogId: string, catalogName: string, file: File): Promise<{ success: boolean; pdfUrl?: string }> {
         if (this.isCloud && this.supabase) {
             try {
-                // 1. Fixed storage path per catalogId so uploads overwrite the exact bucket file
+                // 1. Delete any existing storage file for this catalog (handles path changes between versions)
+                const { data: existingRow } = await this.supabase
+                    .from('minion_catalogs')
+                    .select('pdf_url')
+                    .eq('id', catalogId)
+                    .single()
+
+                if (existingRow?.pdf_url) {
+                    const match = existingRow.pdf_url.match(/\/storage\/v1\/object\/public\/catalogs\/(.+?)(?:\?|#|$)/)
+                    if (match?.[1]) {
+                        const oldPath = decodeURIComponent(match[1])
+                        console.log('Removing old storage file before update:', oldPath)
+                        await this.supabase.storage.from('catalogs').remove([oldPath])
+                    }
+                }
+
+                // 2. Upload PDF file to a stable path: <catalogId>.pdf
                 const cleanId = catalogId.replace(/[^a-zA-Z0-9._-]/g, '_')
-                const storagePath = `catalogs/${cleanId}.pdf`
+                const storagePath = `${cleanId}.pdf`
 
                 const { error: uploadError } = await this.supabase.storage
                     .from('catalogs')
@@ -565,14 +581,14 @@ class DbService {
                     console.warn('Storage bucket upload warning:', uploadError)
                 }
 
-                // Get public URL
+                // 3. Get public URL
                 const { data: urlData } = this.supabase.storage
                     .from('catalogs')
                     .getPublicUrl(storagePath)
 
                 const pdfUrl = urlData?.publicUrl || ''
 
-                // 2. Upsert metadata in minion_catalogs table
+                // 4. Upsert metadata in minion_catalogs table
                 const { error: dbError } = await this.supabase
                     .from('minion_catalogs')
                     .upsert({
@@ -599,13 +615,29 @@ class DbService {
     public async deleteCatalogFromCloud(catalogId: string): Promise<boolean> {
         if (this.isCloud && this.supabase) {
             try {
-                const cleanId = catalogId.replace(/[^a-zA-Z0-9._-]/g, '_')
-                // 1. Delete physical PDF file from Supabase Storage bucket
-                await this.supabase.storage
-                    .from('catalogs')
-                    .remove([`catalogs/${cleanId}.pdf`, `${cleanId}.pdf`, `${catalogId}.pdf`])
+                // 1. Look up the catalog row to get pdf_url (contains the storage path)
+                const { data: catRow } = await this.supabase
+                    .from('minion_catalogs')
+                    .select('pdf_url')
+                    .eq('id', catalogId)
+                    .single()
 
-                // 2. Delete metadata row from minion_catalogs table
+                // 2. Extract storage path from the public URL and delete the physical file
+                if (catRow?.pdf_url) {
+                    // Public URL looks like: https://xxx.supabase.co/storage/v1/object/public/catalogs/some/path.pdf
+                    // We need just the path after /catalogs/
+                    const match = catRow.pdf_url.match(/\/storage\/v1\/object\/public\/catalogs\/(.+?)(?:\?|#|$)/)
+                    if (match?.[1]) {
+                        const storagePath = decodeURIComponent(match[1])
+                        console.log('Deleting storage file:', storagePath)
+                        const { error: removeErr } = await this.supabase.storage
+                            .from('catalogs')
+                            .remove([storagePath])
+                        if (removeErr) console.warn('Storage delete warning:', removeErr)
+                    }
+                }
+
+                // 3. Delete metadata row from minion_catalogs table
                 const { error } = await this.supabase
                     .from('minion_catalogs')
                     .delete()

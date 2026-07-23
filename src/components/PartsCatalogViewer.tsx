@@ -827,6 +827,7 @@ export default function PartsCatalogViewer() {
 
     // --- PDF.js LOADING & RENDERING ---
     useEffect(() => {
+        if (!pdfUrl) return
         const loadPdf = async () => {
             const pdfjsLib = (window as any).pdfjsLib
             if (!pdfjsLib) {
@@ -837,44 +838,11 @@ export default function PartsCatalogViewer() {
 
             setPdfLoading(true)
             try {
-                let doc: any = null
-
-                // 1. Try local IndexedDB ArrayBuffer first (Instant, 100% reliable for local updates)
-                if (pdfName && pdfName !== DEFAULT_CATALOG.id) {
-                    try {
-                        const localBlob = await getPdfFromIndexedDb(pdfName)
-                        if (localBlob) {
-                            const buffer = await localBlob.arrayBuffer()
-                            doc = await pdfjsLib.getDocument({ data: buffer }).promise
-                        }
-                    } catch (e) {
-                        console.warn('IndexedDB blob read notice:', e)
-                    }
-                }
-
-                // 2. Try fetching pdfUrl as ArrayBuffer from Cloud
-                if (!doc && pdfUrl) {
-                    if (pdfUrl.startsWith('data:') || pdfUrl.startsWith('blob:') || pdfUrl === 'sample-catalog.pdf') {
-                        doc = await pdfjsLib.getDocument(pdfUrl).promise
-                    } else {
-                        // Strip any query strings before fetch if needed, use cache reload
-                        const cleanUrl = pdfUrl.split('#')[0]
-                        const response = await fetch(cleanUrl, { cache: 'reload' })
-                        if (response.ok) {
-                            const buffer = await response.arrayBuffer()
-                            doc = await pdfjsLib.getDocument({ data: buffer }).promise
-                        }
-                    }
-                }
-
-                // 3. Fallback to default sample catalog
-                if (!doc) {
-                    doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
-                }
-
-                setPdfDoc(doc)
-                setNumPages(doc.numPages)
-                setPageNumber(prev => Math.min(doc.numPages, Math.max(1, prev)))
+                const loadingTask = pdfjsLib.getDocument(pdfUrl)
+                const pdf = await loadingTask.promise
+                setPdfDoc(pdf)
+                setNumPages(pdf.numPages)
+                setPageNumber(prev => Math.min(pdf.numPages, Math.max(1, prev)))
             } catch (err) {
                 console.error('Failed to load PDF:', err)
                 showToast('Failed to load parts catalog PDF', 'error')
@@ -883,7 +851,7 @@ export default function PartsCatalogViewer() {
             }
         }
         loadPdf()
-    }, [pdfUrl, pdfName])
+    }, [pdfUrl])
 
     // Background metadata scanner: maps figure outlines and page footers to physical page numbers
     useEffect(() => {
@@ -1820,7 +1788,6 @@ export default function PartsCatalogViewer() {
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file && file.type === 'application/pdf') {
-            setPdfLoading(true)
             setPdfDoc(null)
             setPdfLoading(true)
             try {
@@ -1832,8 +1799,9 @@ export default function PartsCatalogViewer() {
                 // Clear cached scan metadata for this catalog id
                 localStorage.removeItem(`pdf_metadata_v3_${meta.id}`)
 
-                const url = meta.pdf_url ? `${meta.pdf_url}?t=${Date.now()}` : URL.createObjectURL(file)
-                setPdfUrl(`${url}#t=${Date.now()}`)
+                // Use a direct blob URL from the File object — bypasses all caching
+                const blobUrl = URL.createObjectURL(file)
+                setPdfUrl(blobUrl)
                 setPdfName(meta.id)
                 setPageNumber(1)
                 showToast(`Uploaded & Loaded catalog: ${file.name}`)
@@ -3081,20 +3049,24 @@ export default function PartsCatalogViewer() {
                 isOpen={showLibraryModal}
                 activeCatalogId={pdfName}
                 onClose={() => setShowLibraryModal(false)}
-                onSelectCatalog={async (cat) => {
+                onSelectCatalog={async (cat, blobUrl) => {
                     localStorage.setItem('minion_current_pdf_name', cat.id)
                     setPageNumber(1)
                     setPdfDoc(null) // Flush old PDF document from memory
                     localStorage.removeItem(`pdf_metadata_v3_${cat.id}`)
 
-                    if (cat.pdf_url) {
+                    // If a direct blob URL was provided (from upload/update), use it — bypasses all caching
+                    if (blobUrl) {
+                        setPdfUrl(blobUrl)
+                        setPdfName(cat.id)
+                    } else if (cat.pdf_url) {
                         setPdfUrl(`${cat.pdf_url}?t=${Date.now()}`)
                         setPdfName(cat.id)
                     } else {
                         const blob = await getPdfFromIndexedDb(cat.id)
                         if (blob) {
                             const url = URL.createObjectURL(blob)
-                            setPdfUrl(`${url}#t=${Date.now()}`)
+                            setPdfUrl(url)
                             setPdfName(cat.id)
                         } else {
                             setPdfUrl('sample-catalog.pdf')
