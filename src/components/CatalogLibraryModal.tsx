@@ -120,34 +120,21 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                 </div>
             )}
 
-            {/* Admin Action Buttons */}
+            {/* Admin Action Buttons (Top Right Badge) */}
             {isAdmin && (
-                <div className="absolute top-3 right-3 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Update Catalog PDF (Preserves Annotations) */}
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            updateInputRef.current?.click()
-                        }}
-                        className="p-1.5 bg-gray-900/90 hover:bg-minion-500 text-gray-300 hover:text-black rounded-lg transition-colors"
-                        title="Update PDF (Preserves Notes & Annotations)"
-                    >
-                        <UploadCloud size={14} />
-                    </button>
-
-                    {/* Delete Catalog */}
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
                     {!catalog.isDefault && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation()
-                                if (confirm(`Delete "${catalog.name}" from catalog library?`)) {
+                                if (confirm(`Delete "${catalog.name}" from catalog library and cloud storage?`)) {
                                     onDelete()
                                 }
                             }}
-                            className="p-1.5 bg-gray-900/90 hover:bg-red-500 text-gray-300 hover:text-white rounded-lg transition-colors"
+                            className="p-1.5 bg-red-600/90 hover:bg-red-500 text-white rounded-lg transition-colors shadow-md cursor-pointer"
                             title="Delete Catalog"
                         >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                         </button>
                     )}
                 </div>
@@ -164,7 +151,7 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
             </div>
 
             {/* Catalog Info */}
-            <div className="w-full text-center space-y-1">
+            <div className="w-full text-center space-y-1 mb-2">
                 <h4 className="text-sm font-bold text-gray-100 group-hover:text-minion-400 transition-colors truncate px-1">
                     {catalog.name}
                 </h4>
@@ -176,6 +163,21 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                     <span>{(catalog.size / (1024 * 1024)).toFixed(1)} MB</span>
                 </div>
             </div>
+
+            {/* Admin Replace PDF Button (Always Visible) */}
+            {isAdmin && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        updateInputRef.current?.click()
+                    }}
+                    className="w-full mt-2 py-1.5 bg-minion-500/15 hover:bg-minion-500 text-minion-400 hover:text-black border border-minion-500/40 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer"
+                    title="Upload a new PDF file for this catalog while keeping all notes & drawings attached"
+                >
+                    <UploadCloud size={13} />
+                    <span>Replace PDF (Keep Notes)</span>
+                </button>
+            )}
         </div>
     )
 }

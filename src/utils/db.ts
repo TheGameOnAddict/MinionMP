@@ -553,16 +553,16 @@ class DbService {
     public async uploadCatalogToCloud(catalogId: string, catalogName: string, file: File): Promise<{ success: boolean; pdfUrl?: string }> {
         if (this.isCloud && this.supabase) {
             try {
-                // 1. Upload PDF file to Supabase Storage bucket 'catalogs'
-                const fileExt = file.name.split('.').pop() || 'pdf'
-                const storagePath = `${catalogId}_${Date.now()}.${fileExt}`
+                // 1. Fixed storage path per catalogId so uploads overwrite the exact bucket file
+                const cleanId = catalogId.replace(/[^a-zA-Z0-9._-]/g, '_')
+                const storagePath = `catalogs/${cleanId}.pdf`
 
                 const { error: uploadError } = await this.supabase.storage
                     .from('catalogs')
                     .upload(storagePath, file, { upsert: true })
 
                 if (uploadError) {
-                    console.warn('Storage bucket upload warning (make sure bucket "catalogs" exists):', uploadError)
+                    console.warn('Storage bucket upload warning:', uploadError)
                 }
 
                 // Get public URL
@@ -599,6 +599,13 @@ class DbService {
     public async deleteCatalogFromCloud(catalogId: string): Promise<boolean> {
         if (this.isCloud && this.supabase) {
             try {
+                const cleanId = catalogId.replace(/[^a-zA-Z0-9._-]/g, '_')
+                // 1. Delete physical PDF file from Supabase Storage bucket
+                await this.supabase.storage
+                    .from('catalogs')
+                    .remove([`catalogs/${cleanId}.pdf`, `${cleanId}.pdf`, `${catalogId}.pdf`])
+
+                // 2. Delete metadata row from minion_catalogs table
                 const { error } = await this.supabase
                     .from('minion_catalogs')
                     .delete()
