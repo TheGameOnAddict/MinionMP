@@ -39,15 +39,15 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                 }
                 let doc: any = null
 
-                if (catalog.id === DEFAULT_CATALOG.id) {
-                    doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
-                } else if (catalog.pdf_url) {
+                if (catalog.pdf_url) {
                     doc = await pdfjsLib.getDocument(catalog.pdf_url).promise
                 } else {
                     const blob = await getPdfFromIndexedDb(catalog.id)
                     if (blob) {
                         const arrayBuffer = await blob.arrayBuffer()
                         doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+                    } else if (catalog.id === DEFAULT_CATALOG.id) {
+                        doc = await pdfjsLib.getDocument('sample-catalog.pdf').promise
                     }
                 }
 

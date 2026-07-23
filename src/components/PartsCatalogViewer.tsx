@@ -794,18 +794,13 @@ export default function PartsCatalogViewer() {
     useEffect(() => {
         const loadStoredPdf = async () => {
             const storedName = localStorage.getItem('minion_current_pdf_name') || DEFAULT_CATALOG.id
-            if (storedName === DEFAULT_CATALOG.id) {
-                setPdfUrl('sample-catalog.pdf')
-                setPdfName(DEFAULT_CATALOG.id)
-                return
-            }
             try {
                 // Check if catalog exists in merged catalog library with a cloud pdf_url
                 const library = await fetchMergedCatalogLibrary()
                 const match = library.find((c: CatalogMetadata) => c.id === storedName)
 
                 if (match?.pdf_url) {
-                    setPdfUrl(match.pdf_url)
+                    setPdfUrl(`${match.pdf_url}?t=${Date.now()}`)
                     setPdfName(match.id)
                     return
                 }
@@ -820,7 +815,7 @@ export default function PartsCatalogViewer() {
                     setPdfName(DEFAULT_CATALOG.id)
                 }
             } catch (err) {
-                console.error('Failed to load PDF from IndexedDB:', err)
+                console.error('Failed to load PDF:', err)
             }
         }
         loadStoredPdf()
@@ -3052,11 +3047,8 @@ export default function PartsCatalogViewer() {
                 onSelectCatalog={async (cat) => {
                     localStorage.setItem('minion_current_pdf_name', cat.id)
                     setPageNumber(1)
-                    if (cat.id === DEFAULT_CATALOG.id) {
-                        setPdfUrl('sample-catalog.pdf')
-                        setPdfName(DEFAULT_CATALOG.id)
-                    } else if (cat.pdf_url) {
-                        setPdfUrl(cat.pdf_url)
+                    if (cat.pdf_url) {
+                        setPdfUrl(`${cat.pdf_url}?t=${Date.now()}`)
                         setPdfName(cat.id)
                     } else {
                         const blob = await getPdfFromIndexedDb(cat.id)
@@ -3064,6 +3056,9 @@ export default function PartsCatalogViewer() {
                             const url = URL.createObjectURL(blob)
                             setPdfUrl(url)
                             setPdfName(cat.id)
+                        } else {
+                            setPdfUrl('sample-catalog.pdf')
+                            setPdfName(DEFAULT_CATALOG.id)
                         }
                     }
                     showToast(`Switched catalog to ${cat.name}`)
