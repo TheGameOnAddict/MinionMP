@@ -758,6 +758,29 @@ class DbService {
         return { success: false }
     }
 
+    public async updateCatalogFolderInCloud(catalogId: string, folderId: string, folderName: string): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('minion_catalogs')
+                    .update({
+                        folder_id: folderId,
+                        folder_name: folderName,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', catalogId)
+
+                if (!error) {
+                    this.triggerLocalUpdate('folders')
+                    return true
+                }
+            } catch (e) {
+                console.error('Supabase updateCatalogFolderInCloud failed:', e)
+            }
+        }
+        return false
+    }
+
     public async deleteCatalogFromCloud(catalogId: string): Promise<boolean> {
         if (this.isCloud && this.supabase) {
             try {

@@ -11,6 +11,8 @@ export interface CatalogMetadata {
     filename: string
     size: number
     uploadDate: string
+    folder_id?: string
+    folder_name?: string
     pdf_url?: string
     isDefault?: boolean
 }
@@ -100,6 +102,8 @@ export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> =>
             id: c.id,
             name: c.name,
             filename: c.filename,
+            folder_id: (c as any).folder_id,
+            folder_name: (c as any).folder_name,
             pdf_url: c.pdf_url,
             size: c.size,
             uploadDate: new Date(c.updated_at).toLocaleDateString()
@@ -119,17 +123,19 @@ export const fetchMergedCatalogLibrary = async (): Promise<CatalogMetadata[]> =>
     return localList
 }
 
-export const addCatalogToLibrary = async (file: File, customName?: string, targetId?: string): Promise<CatalogMetadata> => {
+export const addCatalogToLibrary = async (file: File, customName?: string, targetId?: string, folderId?: string, folderName?: string): Promise<CatalogMetadata> => {
     const id = targetId || `catalog_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
     const catalogName = customName || file.name.replace(/\.pdf$/i, '')
 
     // 1. Upload to Supabase Cloud if active
-    const cloudRes = await db.uploadCatalogToCloud(id, catalogName, file)
+    const cloudRes = await db.uploadCatalogToCloud(id, catalogName, file, folderId, folderName)
 
     const meta: CatalogMetadata = {
         id,
         name: catalogName,
         filename: file.name,
+        folder_id: folderId,
+        folder_name: folderName,
         size: file.size,
         pdf_url: cloudRes.pdfUrl,
         uploadDate: new Date().toLocaleDateString()
@@ -144,6 +150,19 @@ export const addCatalogToLibrary = async (file: File, customName?: string, targe
     localStorage.setItem('minion_catalog_library', JSON.stringify(updated))
 
     return meta
+}
+
+export const updateCatalogFolderInLibrary = async (catalogId: string, folderId: string, folderName: string): Promise<CatalogMetadata[]> => {
+    const currentList = getCatalogLibrary()
+    const updated = currentList.map(c => {
+        if (c.id === catalogId) {
+            return { ...c, folder_id: folderId, folder_name: folderName }
+        }
+        return c
+    })
+    localStorage.setItem('minion_catalog_library', JSON.stringify(updated))
+    await db.updateCatalogFolderInCloud(catalogId, folderId, folderName)
+    return updated
 }
 
 export const removeCatalogFromLibrary = async (catalogId: string): Promise<void> => {

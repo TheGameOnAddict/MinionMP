@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { BookOpen, Trash2, Check, X, Plus, FileText, RefreshCw, Lock, UploadCloud } from 'lucide-react'
-import { getCatalogLibrary, fetchMergedCatalogLibrary, CatalogMetadata, getPdfFromIndexedDb, addCatalogToLibrary, removeCatalogFromLibrary, DEFAULT_CATALOG } from '../utils/pdfStore'
+import { BookOpen, Trash2, Check, X, Plus, FileText, RefreshCw, Lock, UploadCloud, Folder } from 'lucide-react'
+import { getCatalogLibrary, fetchMergedCatalogLibrary, CatalogMetadata, getPdfFromIndexedDb, addCatalogToLibrary, removeCatalogFromLibrary, updateCatalogFolderInLibrary, DEFAULT_CATALOG } from '../utils/pdfStore'
 import { adminStore } from '../utils/adminStore'
 import { db, CatalogFolder } from '../utils/db'
 
@@ -14,14 +14,16 @@ interface CatalogLibraryModalProps {
 
 interface CatalogCardProps {
     catalog: CatalogMetadata
+    folders: CatalogFolder[]
     isActive: boolean
     isAdmin: boolean
     onSelect: () => void
     onDelete: () => void
     onUpdatePdf: (file: File) => void
+    onMoveToFolder: (folderId: string, folderName: string) => void
 }
 
-function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdatePdf }: CatalogCardProps) {
+function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, onUpdatePdf, onMoveToFolder }: CatalogCardProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const updateInputRef = useRef<HTMLInputElement>(null)
     const [loading, setLoading] = useState(true)
@@ -90,7 +92,7 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
     return (
         <div
             onClick={onSelect}
-            className={`group relative bg-gray-850/80 hover:bg-gray-800 border-2 rounded-2xl p-4 flex flex-col items-center transition-all duration-300 hover:scale-[1.03] shadow-xl hover:shadow-2xl hover:shadow-minion-500/10 cursor-pointer overflow-hidden ${
+            className={`group relative bg-gray-850/80 hover:bg-gray-800 border-2 rounded-2xl p-4 flex flex-col items-center transition-all duration-300 hover:scale-[1.02] shadow-xl hover:shadow-2xl hover:shadow-minion-500/10 cursor-pointer overflow-hidden ${
                 isActive ? 'border-minion-500 ring-2 ring-minion-500/30' : 'border-gray-800 hover:border-gray-700'
             }`}
         >
@@ -151,7 +153,7 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
             )}
 
             {/* E-book Cover Frame */}
-            <div className="w-full h-48 bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center relative shadow-inner mb-3 border border-gray-800/80">
+            <div className="w-full h-44 bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center relative shadow-inner mb-3 border border-gray-800/80">
                 {loading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900/60 z-10">
                         <RefreshCw className="animate-spin text-minion-500" size={20} />
@@ -160,8 +162,8 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                 <canvas ref={canvasRef} className="max-h-full max-w-full object-contain block group-hover:scale-105 transition-transform duration-500" />
             </div>
 
-            {/* Catalog Info */}
-            <div className="w-full text-center space-y-1">
+            {/* Catalog Info & Folder Badge */}
+            <div className="w-full text-center space-y-1.5">
                 <h4 className="text-sm font-bold text-gray-100 group-hover:text-minion-400 transition-colors truncate px-1">
                     {catalog.name}
                 </h4>
@@ -171,6 +173,36 @@ function CatalogCard({ catalog, isActive, isAdmin, onSelect, onDelete, onUpdateP
                     </span>
                     <span>•</span>
                     <span>{(catalog.size / (1024 * 1024)).toFixed(1)} MB</span>
+                </div>
+
+                {/* Assigned Folder Badge */}
+                <div className="pt-0.5 flex items-center justify-center">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold font-mono text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                        <Folder size={10} /> {catalog.folder_name || 'GENERAL & ENGINES'}
+                    </span>
+                </div>
+
+                {/* Move to Folder Selector (Admin & User) */}
+                <div className="w-full mt-2 pt-2 border-t border-gray-800 flex items-center justify-between gap-1 text-[11px]" onClick={e => e.stopPropagation()}>
+                    <span className="text-gray-400 font-bold text-[10px] flex items-center gap-1 shrink-0">
+                        <Folder size={11} className="text-amber-400" /> Move to:
+                    </span>
+                    <select
+                        value={catalog.folder_id || 'folder_general'}
+                        onChange={(e) => {
+                            const selectedF = folders.find(f => f.id === e.target.value)
+                            if (selectedF) {
+                                onMoveToFolder(selectedF.id, selectedF.name)
+                            }
+                        }}
+                        className="bg-gray-900 border border-gray-700 hover:border-amber-400 text-gray-200 text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer font-mono shrink-0 max-w-[150px] truncate"
+                    >
+                        {folders.map(f => (
+                            <option key={f.id} value={f.id}>
+                                {f.name}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
         </div>
@@ -239,19 +271,24 @@ export default function CatalogLibraryModal({
         setSelectedFolderId(newFolder.id)
     }
 
+    const handleMoveCatalogToFolder = async (catalogId: string, folderId: string, folderName: string) => {
+        const updated = await updateCatalogFolderInLibrary(catalogId, folderId, folderName)
+        setCatalogs(updated)
+        await refreshCatalogsAndFolders()
+    }
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
         setUploading(true)
         try {
-            const activeFolder = folders.find(f => f.id === selectedFolderId)
-            const newMeta = await addCatalogToLibrary(file, undefined, undefined)
-            
-            if (activeFolder && db.getConfig().isCloud) {
-                await db.uploadCatalogToCloud(newMeta.id, newMeta.name, file, activeFolder.id, activeFolder.name)
-            }
+            const activeFolder = folders.find(f => f.id === selectedFolderId) || folders[0]
+            const folderId = activeFolder ? activeFolder.id : 'folder_general'
+            const folderName = activeFolder ? activeFolder.name : 'GENERAL & ENGINES'
 
+            const newMeta = await addCatalogToLibrary(file, undefined, undefined, folderId, folderName)
+            
             await refreshCatalogsAndFolders()
             const blobUrl = URL.createObjectURL(file)
             onSelectCatalog(newMeta, blobUrl)
@@ -272,12 +309,11 @@ export default function CatalogLibraryModal({
             const catalogDisplayName = targetCatalog?.name || catalogId
             localStorage.removeItem(`pdf_metadata_v3_${catalogId}`)
 
-            const activeFolder = folders.find(f => f.id === selectedFolderId)
-            const updatedMeta = await addCatalogToLibrary(file, targetCatalog?.name, catalogId)
+            const activeFolder = folders.find(f => f.id === selectedFolderId) || folders[0]
+            const folderId = targetCatalog?.folder_id || activeFolder?.id || 'folder_general'
+            const folderName = targetCatalog?.folder_name || activeFolder?.name || 'GENERAL & ENGINES'
 
-            if (db.getConfig().isCloud) {
-                await db.uploadCatalogToCloud(catalogId, targetCatalog?.name || catalogId, file, activeFolder?.id, activeFolder?.name)
-            }
+            const updatedMeta = await addCatalogToLibrary(file, targetCatalog?.name, catalogId, folderId, folderName)
 
             await refreshCatalogsAndFolders()
             const blobUrl = URL.createObjectURL(file)
@@ -304,8 +340,7 @@ export default function CatalogLibraryModal({
 
     const filteredCatalogs = catalogs.filter(cat => {
         if (selectedFolderId === 'all') return true
-        if ((cat as any).folder_id) return (cat as any).folder_id === selectedFolderId
-        // Fallback matching by folder keyword
+        if (cat.folder_id) return cat.folder_id === selectedFolderId
         const folderObj = folders.find(f => f.id === selectedFolderId)
         if (folderObj) {
             const fName = folderObj.name.toLowerCase()
@@ -360,19 +395,36 @@ export default function CatalogLibraryModal({
                     </button>
 
                     {folders.map(folder => {
-                        const count = catalogs.filter(c => (c as any).folder_id === folder.id || c.name.toLowerCase().includes(folder.name.toLowerCase())).length
+                        const count = catalogs.filter(c => c.folder_id === folder.id || (c.folder_name && c.folder_name === folder.name) || c.name.toLowerCase().includes(folder.name.toLowerCase())).length
                         return (
-                            <button
-                                key={folder.id}
-                                onClick={() => setSelectedFolderId(folder.id)}
-                                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                                    selectedFolderId === folder.id
-                                        ? 'bg-amber-400 text-black font-black shadow-md'
-                                        : 'bg-gray-850 text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-750'
-                                }`}
-                            >
-                                <span>📁 {folder.name} ({count})</span>
-                            </button>
+                            <div key={folder.id} className="flex items-center shrink-0">
+                                <button
+                                    onClick={() => setSelectedFolderId(folder.id)}
+                                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                        selectedFolderId === folder.id
+                                            ? 'bg-amber-400 text-black font-black shadow-md'
+                                            : 'bg-gray-850 text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-750'
+                                    }`}
+                                >
+                                    <span>📁 {folder.name} ({count})</span>
+                                </button>
+                                {isAdmin && folder.id !== 'folder_general' && (
+                                    <button
+                                        onClick={async (e) => {
+                                            e.stopPropagation()
+                                            if (confirm(`Delete folder "${folder.name}"? Catalogs inside will be moved.`)) {
+                                                await db.deleteCatalogFolder(folder.id)
+                                                await refreshCatalogsAndFolders()
+                                                setSelectedFolderId('all')
+                                            }
+                                        }}
+                                        className="ml-1 p-1 text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded text-xs cursor-pointer"
+                                        title={`Delete folder ${folder.name}`}
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
                         )
                     })}
 
@@ -423,6 +475,7 @@ export default function CatalogLibraryModal({
                                 <CatalogCard
                                     key={cat.id}
                                     catalog={cat}
+                                    folders={folders}
                                     isActive={activeCatalogId === cat.id}
                                     isAdmin={isAdmin}
                                     onSelect={() => {
@@ -431,6 +484,7 @@ export default function CatalogLibraryModal({
                                     }}
                                     onDelete={() => handleDeleteCatalog(cat.id)}
                                     onUpdatePdf={(file) => handleUpdateCatalogPdf(cat.id, file)}
+                                    onMoveToFolder={(fId, fName) => handleMoveCatalogToFolder(cat.id, fId, fName)}
                                 />
                             ))}
 
