@@ -247,17 +247,13 @@ export default function CatalogLibraryModal({
             // Invalidate old page metadata scan cache so new figures and pages are indexed
             localStorage.removeItem(`pdf_metadata_v3_${catalogId}`)
 
-            console.debug('[CatalogUpdate] Starting update for:', catalogId, 'file:', file.name, 'size:', file.size)
             const updatedMeta = await addCatalogToLibrary(file, targetCatalog?.name, catalogId)
-            console.debug('[CatalogUpdate] addCatalogToLibrary returned:', updatedMeta)
             await refreshCatalogs()
 
             // Create a direct blob URL from the raw File object — bypasses ALL caching
             const blobUrl = URL.createObjectURL(file)
-            console.debug('[CatalogUpdate] Created blobUrl:', blobUrl, 'calling onSelectCatalog...')
             onSelectCatalog(updatedMeta, blobUrl)
             onClose()
-            // Use setTimeout so the alert doesn't block React from flushing the state updates
             setTimeout(() => alert(`Updated PDF for "${catalogDisplayName}"! All linked notes and drawings have been preserved.`), 100)
         } catch (err) {
             console.error('Failed to update catalog PDF:', err)
