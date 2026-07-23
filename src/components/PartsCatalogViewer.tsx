@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
-import { savePdfToIndexedDb, getPdfFromIndexedDb, fetchMergedCatalogLibrary, CatalogMetadata, DEFAULT_CATALOG } from '../utils/pdfStore'
+import { getPdfFromIndexedDb, fetchMergedCatalogLibrary, addCatalogToLibrary, CatalogMetadata, DEFAULT_CATALOG } from '../utils/pdfStore'
 import { extractIPCIndexBlocks, ParsedIndexBlock, ParsedItem } from '../utils/parser'
 import { adminStore } from '../utils/adminStore'
 import AdminPasswordModal from './AdminPasswordModal'
@@ -1791,21 +1791,27 @@ export default function PartsCatalogViewer() {
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file && file.type === 'application/pdf') {
+            setPdfLoading(true)
             try {
-                await savePdfToIndexedDb(file)
-                localStorage.setItem('minion_current_pdf_name', file.name)
+                const meta = await addCatalogToLibrary(file)
+                localStorage.setItem('minion_current_pdf_name', meta.id)
+                localStorage.removeItem('minion_active_pdf_id_override')
+                setCurrentPdfIdOverride(null)
+
+                // Clear cached scan metadata for this catalog id
+                localStorage.removeItem(`pdf_metadata_v3_${meta.id}`)
+
+                const url = meta.pdf_url ? `${meta.pdf_url}?t=${Date.now()}` : URL.createObjectURL(file)
+                setPdfUrl(url)
+                setPdfName(meta.id)
+                setPageNumber(1)
+                showToast(`Uploaded & Loaded catalog: ${file.name}`)
             } catch (err) {
-                console.error('Failed to save PDF to IndexedDB:', err)
+                console.error('Failed to save PDF:', err)
+                showToast('Failed to upload PDF catalog', 'error')
+            } finally {
+                setPdfLoading(false)
             }
-
-            localStorage.removeItem('minion_active_pdf_id_override')
-            setCurrentPdfIdOverride(null)
-
-            const url = URL.createObjectURL(file)
-            setPdfUrl(url)
-            setPdfName(file.name)
-            setPageNumber(1)
-            showToast(`Loaded catalog: ${file.name}`)
         }
     }
 

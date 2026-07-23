@@ -225,7 +225,13 @@ export default function CatalogLibraryModal({
         setUploading(true)
         try {
             const targetCatalog = catalogs.find(c => c.id === catalogId)
+            // Invalidate old page metadata scan cache so new figures and pages are indexed
+            localStorage.removeItem(`pdf_metadata_v3_${catalogId}`)
+
             const updatedMeta = await addCatalogToLibrary(file, targetCatalog?.name, catalogId)
+            if (updatedMeta.pdf_url) {
+                updatedMeta.pdf_url = `${updatedMeta.pdf_url}?t=${Date.now()}`
+            }
             await refreshCatalogs()
             if (activeCatalogId === catalogId) {
                 onSelectCatalog(updatedMeta)
