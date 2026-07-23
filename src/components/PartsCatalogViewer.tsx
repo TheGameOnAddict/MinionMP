@@ -3,12 +3,15 @@ import { useState, useEffect, useRef } from 'react'
 import {
     ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
     Square, Circle, Edit3, Type, Grid, Trash2,
-    RefreshCw, ArrowLeft, Info, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search
+    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Library
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
-import { savePdfToIndexedDb, getPdfFromIndexedDb } from '../utils/pdfStore'
+import { savePdfToIndexedDb, getPdfFromIndexedDb, DEFAULT_CATALOG } from '../utils/pdfStore'
 import { extractIPCIndexBlocks, ParsedIndexBlock, ParsedItem } from '../utils/parser'
+import { adminStore } from '../utils/adminStore'
+import AdminPasswordModal from './AdminPasswordModal'
+import CatalogLibraryModal from './CatalogLibraryModal'
 
 type StagedParsedItem = ParsedItem & { selected: boolean }
 
@@ -353,6 +356,18 @@ interface CatalogSaveProfile {
 export default function PartsCatalogViewer() {
     // Database & Sync Config
     const [dbConfig] = useState(db.getConfig())
+
+    // Admin Mode & Catalog Library State
+    const [isAdmin, setIsAdmin] = useState(adminStore.getIsUnlocked())
+    const [showAdminModal, setShowAdminModal] = useState(false)
+    const [showLibraryModal, setShowLibraryModal] = useState(false)
+
+    useEffect(() => {
+        const unsubscribe = adminStore.subscribe(() => {
+            setIsAdmin(adminStore.getIsUnlocked())
+        })
+        return unsubscribe
+    }, [])
 
     // PDF State
     const [pdfUrl, setPdfUrl] = useState<string>('sample-catalog.pdf')
@@ -778,13 +793,21 @@ export default function PartsCatalogViewer() {
     // Restore stored PDF from IndexedDB on page load
     useEffect(() => {
         const loadStoredPdf = async () => {
+            const storedName = localStorage.getItem('minion_current_pdf_name') || DEFAULT_CATALOG.id
+            if (storedName === DEFAULT_CATALOG.id) {
+                setPdfUrl('sample-catalog.pdf')
+                setPdfName(DEFAULT_CATALOG.id)
+                return
+            }
             try {
-                const storedBlob = await getPdfFromIndexedDb()
-                const storedName = localStorage.getItem('minion_current_pdf_name')
-                if (storedBlob && storedName) {
+                const storedBlob = await getPdfFromIndexedDb(storedName)
+                if (storedBlob) {
                     const url = URL.createObjectURL(storedBlob)
                     setPdfUrl(url)
                     setPdfName(storedName)
+                } else {
+                    setPdfUrl('sample-catalog.pdf')
+                    setPdfName(DEFAULT_CATALOG.id)
                 }
             } catch (err) {
                 console.error('Failed to load PDF from IndexedDB:', err)
@@ -1866,6 +1889,15 @@ export default function PartsCatalogViewer() {
                     </div>
 
                     <button
+                        onClick={() => setShowLibraryModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-750 hover:border-gray-650 rounded-lg text-xs font-bold text-gray-200 transition-colors cursor-pointer"
+                        title="Browse Catalog Library"
+                    >
+                        <Library size={14} className="text-minion-400" />
+                        <span>Catalog Library</span>
+                    </button>
+
+                    <button
                         onClick={() => setIsDrawerOpen(true)}
                         className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-750 hover:border-gray-650 rounded-lg text-xs font-bold text-gray-200 transition-colors cursor-pointer"
                     >
@@ -1878,15 +1910,33 @@ export default function PartsCatalogViewer() {
                         )}
                     </button>
 
-                    <label className="text-xs text-gray-400 hover:text-white bg-gray-800 border border-gray-700 hover:border-gray-600 px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
-                        Upload Catalog PDF
-                        <input
-                            type="file"
-                            accept=".pdf"
-                            onChange={handleFileChange}
-                            className="hidden"
-                        />
-                    </label>
+                    {isAdmin && (
+                        <label className="text-xs text-gray-400 hover:text-white bg-gray-800 border border-gray-700 hover:border-gray-600 px-3 py-1.5 rounded-lg cursor-pointer transition-colors animate-fade-in">
+                            Upload Catalog PDF
+                            <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
+                        </label>
+                    )}
+
+                    <button
+                        onClick={() => {
+                            if (isAdmin) adminStore.lock()
+                            else setShowAdminModal(true)
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                            isAdmin
+                                ? 'bg-green-500/20 text-green-400 border-green-500/40 hover:bg-green-500/30'
+                                : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white hover:bg-gray-750'
+                        }`}
+                        title={isAdmin ? "Lock Admin Mode" : "Unlock Admin Mode"}
+                    >
+                        {isAdmin ? <Unlock size={14} /> : <Lock size={14} />}
+                        <span>{isAdmin ? 'Admin' : 'Admin'}</span>
+                    </button>
 
                     <button
                         onClick={() => setShowSettingsModal(true)}
@@ -2972,10 +3022,39 @@ export default function PartsCatalogViewer() {
                 </div>
             )}
 
+            {/* Admin Password Modal */}
+            <AdminPasswordModal
+                isOpen={showAdminModal}
+                onClose={() => setShowAdminModal(false)}
+            />
+
+            {/* E-book Style Catalog Library Grid Modal */}
+            <CatalogLibraryModal
+                isOpen={showLibraryModal}
+                activeCatalogId={pdfName}
+                onClose={() => setShowLibraryModal(false)}
+                onSelectCatalog={async (cat) => {
+                    localStorage.setItem('minion_current_pdf_name', cat.id)
+                    setPageNumber(1)
+                    if (cat.id === DEFAULT_CATALOG.id) {
+                        setPdfUrl('sample-catalog.pdf')
+                        setPdfName(DEFAULT_CATALOG.id)
+                    } else {
+                        const blob = await getPdfFromIndexedDb(cat.id)
+                        if (blob) {
+                            const url = URL.createObjectURL(blob)
+                            setPdfUrl(url)
+                            setPdfName(cat.id)
+                        }
+                    }
+                    showToast(`Switched catalog to ${cat.name}`)
+                }}
+                onRequestAdminUnlock={() => setShowAdminModal(true)}
+            />
+
             {/* Quick Feedback Toast */}
             {toast && (
                 <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-2.5 z-50 animate-fade-in ${toast.type === 'success' ? 'bg-green-600/20 border-green-500/30 text-green-400' : 'bg-red-600/20 border-red-500/30 text-red-400'}`}>
-                    <Info size={16} />
                     <span className="text-xs font-semibold">{toast.message}</span>
                 </div>
             )}

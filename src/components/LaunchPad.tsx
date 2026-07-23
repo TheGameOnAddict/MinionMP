@@ -1,15 +1,30 @@
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Compass, LayoutDashboard, Database } from 'lucide-react'
+import { BookOpen, Compass, LayoutDashboard, Database, Lock, Unlock, Library } from 'lucide-react'
 import { version } from '../../package.json'
 import { useState, useEffect } from 'react'
 import { db } from '../utils/db'
+import { adminStore } from '../utils/adminStore'
+import AdminPasswordModal from './AdminPasswordModal'
+import CatalogLibraryModal from './CatalogLibraryModal'
 
 export default function LaunchPad() {
     const navigate = useNavigate()
     const [showConfig, setShowConfig] = useState(false)
+    const [showAdminModal, setShowAdminModal] = useState(false)
+    const [showLibraryModal, setShowLibraryModal] = useState(false)
+    const [isAdmin, setIsAdmin] = useState(adminStore.getIsUnlocked())
+    const [activeCatalogId, setActiveCatalogId] = useState(() => localStorage.getItem('minion_current_pdf_name') || 'sample-catalog.pdf')
+
     const [supabaseUrl, setSupabaseUrl] = useState('')
     const [supabaseKey, setSupabaseKey] = useState('')
     const [dbConfig, setDbConfig] = useState(db.getConfig())
+
+    useEffect(() => {
+        const unsubscribe = adminStore.subscribe(() => {
+            setIsAdmin(adminStore.getIsUnlocked())
+        })
+        return unsubscribe
+    }, [])
 
     useEffect(() => {
         setSupabaseUrl(dbConfig.url)
@@ -32,11 +47,42 @@ export default function LaunchPad() {
         alert('Switched back to Local Storage mode.')
     }
 
+    const handleToggleAdmin = () => {
+        if (isAdmin) {
+            adminStore.lock()
+        } else {
+            setShowAdminModal(true)
+        }
+    }
+
     return (
         <div className="h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8 select-none relative overflow-hidden">
             {/* Background elements */}
             <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-minion-500/5 blur-[120px]" />
             <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-purple-500/5 blur-[120px]" />
+
+            {/* Top Right Admin Lock Button */}
+            <div className="absolute top-6 right-6 z-20 flex items-center gap-3">
+                <button
+                    onClick={() => setShowLibraryModal(true)}
+                    className="flex items-center gap-2 text-xs font-bold text-gray-300 hover:text-white px-3.5 py-2 bg-gray-800/80 hover:bg-gray-800 border border-gray-700/80 rounded-xl transition-all shadow-lg cursor-pointer"
+                >
+                    <Library size={15} className="text-minion-400" />
+                    <span>Catalog Library</span>
+                </button>
+
+                <button
+                    onClick={handleToggleAdmin}
+                    className={`flex items-center gap-2 text-xs font-bold px-3.5 py-2 rounded-xl border transition-all shadow-lg cursor-pointer ${
+                        isAdmin
+                            ? 'bg-green-500/20 text-green-400 border-green-500/40 hover:bg-green-500/30'
+                            : 'bg-gray-800/80 text-gray-400 border-gray-700/80 hover:text-white hover:bg-gray-800'
+                    }`}
+                >
+                    {isAdmin ? <Unlock size={15} /> : <Lock size={15} />}
+                    <span>{isAdmin ? 'Admin Mode Active' : 'Admin Login'}</span>
+                </button>
+            </div>
 
             <div className="mb-10 text-center z-10">
                 <h1 className="text-5xl font-extrabold bg-gradient-to-r from-minion-400 via-minion-500 to-minion-600 bg-clip-text text-transparent mb-3 tracking-tight">
@@ -101,14 +147,35 @@ export default function LaunchPad() {
                 </button>
             </div>
 
-            {/* Supabase Config Button */}
-            <button
-                onClick={() => setShowConfig(true)}
-                className="z-10 flex items-center gap-2 text-xs text-gray-500 hover:text-minion-400 transition-colors px-3 py-1.5 bg-gray-800/30 rounded-lg border border-gray-800 hover:border-gray-700 hover:bg-gray-800/50 cursor-pointer"
-            >
-                <Database size={14} />
-                <span>Configure Supabase Cloud Sync</span>
-            </button>
+            {/* Supabase Config Button (Visible ONLY to Admin) */}
+            {isAdmin && (
+                <button
+                    onClick={() => setShowConfig(true)}
+                    className="z-10 flex items-center gap-2 text-xs text-gray-400 hover:text-minion-400 transition-colors px-3 py-1.5 bg-gray-800/50 hover:bg-gray-800 rounded-lg border border-gray-750 cursor-pointer animate-fade-in"
+                >
+                    <Database size={14} />
+                    <span>Configure Supabase Cloud Sync</span>
+                </button>
+            )}
+
+            {/* Admin Password Modal */}
+            <AdminPasswordModal
+                isOpen={showAdminModal}
+                onClose={() => setShowAdminModal(false)}
+            />
+
+            {/* E-book Reader Style Catalog Library Modal */}
+            <CatalogLibraryModal
+                isOpen={showLibraryModal}
+                activeCatalogId={activeCatalogId}
+                onClose={() => setShowLibraryModal(false)}
+                onSelectCatalog={(catalog) => {
+                    localStorage.setItem('minion_current_pdf_name', catalog.id)
+                    setActiveCatalogId(catalog.id)
+                    navigate('/catalog')
+                }}
+                onRequestAdminUnlock={() => setShowAdminModal(true)}
+            />
 
             {/* Cloud Config Modal */}
             {showConfig && (
