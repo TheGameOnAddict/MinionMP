@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
     ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
     Square, Circle, Edit3, Type, Grid, Trash2,
-    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Library, Printer
+    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Printer, ChevronDown, FileText
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
@@ -604,6 +604,8 @@ export default function PartsCatalogViewer() {
     const [isAdmin, setIsAdmin] = useState(adminStore.getIsUnlocked())
     const [showAdminModal, setShowAdminModal] = useState(false)
     const [showLibraryModal, setShowLibraryModal] = useState(false)
+    const [activeCatalogFolder, setActiveCatalogFolder] = useState<string>('PA-28 WARRIOR')
+    const [isHideClipboardParser, setIsHideClipboardParser] = useState<boolean>(false)
 
     // Multi-Page Print & Options State
     const [showPrintModal, setShowPrintModal] = useState(false)
@@ -630,9 +632,17 @@ export default function PartsCatalogViewer() {
         return unsubscribe
     }, [])
 
+    // Prompt for catalog selection on initial entry if default or sample catalog
+    useEffect(() => {
+        const savedCat = localStorage.getItem('minion_current_pdf_name')
+        if (!savedCat || savedCat === 'sample-catalog.pdf') {
+            setShowLibraryModal(true)
+        }
+    }, [])
+
     // PDF State
-    const [pdfUrl, setPdfUrl] = useState<string>('sample-catalog.pdf')
-    const [pdfName, setPdfName] = useState<string>(() => localStorage.getItem('minion_current_pdf_name') || 'sample-catalog.pdf')
+    const [pdfUrl, setPdfUrl] = useState<string>('')
+    const [pdfName, setPdfName] = useState<string>(() => localStorage.getItem('minion_current_pdf_name') || '')
     const [pdfDoc, setPdfDoc] = useState<any>(null)
     const [pageNumber, setPageNumber] = useState<number>(() => Number(localStorage.getItem('minion_current_page_number')) || 1)
     const [numPages, setNumPages] = useState<number>(0)
@@ -875,7 +885,8 @@ export default function PartsCatalogViewer() {
     const [indexSelections, setIndexSelections] = useState<Record<number, Record<string, Record<string, boolean>>>>({})
     const indexSelectionsRef = useRef<Record<number, Record<string, Record<string, boolean>>>>({})
     useEffect(() => { indexSelectionsRef.current = indexSelections }, [indexSelections])
-    const [showOutlineSidebar, setShowOutlineSidebar] = useState<boolean>(false)
+    const [showOutlineSidebar, setShowOutlineSidebar] = useState<boolean>(true)
+    const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(true)
     const [outlineItems, setOutlineItems] = useState<any[]>([])
     const [outlineMarkers, setOutlineMarkers] = useState<any[]>([])
     const [isFigHovered, setIsFigHovered] = useState<boolean>(false)
@@ -2372,20 +2383,27 @@ export default function PartsCatalogViewer() {
                     </h1>
                 </div>
 
+                {/* Aircraft Folder & Catalog Carousel Selector Button */}
+                <button
+                    onClick={() => setShowLibraryModal(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-950/80 hover:bg-gray-800 border border-gray-800 hover:border-amber-500/50 rounded-xl text-xs font-bold text-gray-200 transition-all cursor-pointer shadow-md group"
+                    title="Click to switch Aircraft Folder & Catalog"
+                >
+                    <span className="font-mono text-[11px] text-amber-300 uppercase tracking-wider font-extrabold flex items-center gap-1">
+                        📁 {activeCatalogFolder}
+                    </span>
+                    <span className="text-gray-600 font-normal">/</span>
+                    <span className="text-gray-100 font-bold truncate max-w-[220px] flex items-center gap-1">
+                        📖 {pdfName ? pdfName.replace(/\.pdf$/i, '') : 'Select Catalog'}
+                    </span>
+                    <ChevronDown size={14} className="text-amber-400 group-hover:text-minion-400" />
+                </button>
+
                 <div className="flex items-center gap-4">
                     <div className="text-xs text-gray-550 flex items-center gap-1">
                         <span className={`w-2 h-2 rounded-full ${dbConfig.isCloud ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
                         {dbConfig.isCloud ? 'Cloud Sync Active' : 'Local Storage Mode'}
                     </div>
-
-                    <button
-                        onClick={() => setShowLibraryModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-750 hover:border-gray-650 rounded-lg text-xs font-bold text-gray-200 transition-colors cursor-pointer"
-                        title="Browse Catalog Library"
-                    >
-                        <Library size={14} className="text-minion-400" />
-                        <span>Catalog Library</span>
-                    </button>
 
                     <button
                         onClick={() => setShowPrintModal(true)}
@@ -2449,13 +2467,15 @@ export default function PartsCatalogViewer() {
 
             {/* Main Area */}
             <div className={`flex-1 flex min-h-0 overflow-hidden transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'mr-[360px]' : ''}`}>
-                {/* Outline Sidebar */}
+                {/* Outline & Search Sidebar */}
                 <div 
-                    className={`bg-gray-900 flex flex-col min-h-0 select-none shrink-0 transition-[width,border,opacity] duration-300 ease-in-out overflow-hidden ${showOutlineSidebar ? 'w-64 border-r border-gray-800 opacity-100' : 'w-0 border-r-0 border-transparent opacity-0'}`}
+                    className={`bg-gray-900 flex flex-col min-h-0 select-none shrink-0 transition-[width,border,opacity] duration-300 ease-in-out overflow-hidden ${
+                        showOutlineSidebar ? 'w-64 border-r border-gray-800 opacity-100' : 'w-0 border-r-0 border-transparent opacity-0'
+                    }`}
                 >
                     <div className="w-64 flex flex-col h-full min-h-0">
-                        {/* Tab Selector */}
-                        <div className="flex border-b border-gray-800 shrink-0">
+                        {/* Tab Selector & Sidebar Pin Button */}
+                        <div className="flex items-center border-b border-gray-800 shrink-0 pr-2 bg-gray-950/40">
                             <button
                                 onClick={() => setSidebarTab('outline')}
                                 className={`flex-1 py-2 text-center text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -2475,6 +2495,21 @@ export default function PartsCatalogViewer() {
                                 }`}
                             >
                                 <Search size={12} /> Search
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const next = !isSidebarPinned
+                                    setIsSidebarPinned(next)
+                                    setShowOutlineSidebar(next)
+                                }}
+                                className={`p-1.5 rounded-lg border transition-all cursor-pointer ml-1 ${
+                                    isSidebarPinned
+                                        ? 'bg-amber-400/20 border-amber-400/50 text-amber-300 font-bold'
+                                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
+                                }`}
+                                title={isSidebarPinned ? "Sidebar is Pinned Open (Click to unpin)" : "Pin Sidebar Open"}
+                            >
+                                <Pin size={12} className={isSidebarPinned ? "fill-amber-400 text-amber-400" : ""} />
                             </button>
                         </div>
 
@@ -3211,70 +3246,71 @@ export default function PartsCatalogViewer() {
                     )}
                 </div>
                     {tool === 'index' && (
-                        <div className={`fixed left-4 bottom-4 z-30 rounded-xl border border-gray-800 bg-gray-900 shadow-xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
+                        <div className={`fixed left-4 bottom-4 z-30 rounded-2xl border-2 border-amber-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
                             {/* Header */}
-                            <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-900 px-3 py-2">
+                            <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
                                 <div className="min-w-0">
-                                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-minion-400 flex items-center gap-1.5">
-                                        <ListTree size={11} /> Index Preview
+                                    <div className="text-xs font-black uppercase tracking-[0.16em] text-minion-400 flex items-center gap-1.5">
+                                        <ListTree size={14} /> Index &amp; Subpart Editor
                                     </div>
-                                    <div className="text-[9px] text-gray-500 mt-0.5">Scroll over PDF to cycle indexes ? edit qty &amp; uncheck before adding</div>
+                                    <div className="text-[10px] text-gray-400 mt-0.5 font-medium">Toggle checkboxes to include/exclude subparts &amp; edit quantities</div>
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className="rounded border border-gray-700 bg-gray-850 px-2 py-1 text-[10px] font-bold text-gray-200 font-mono">
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className="rounded-lg border border-gray-700 bg-gray-850 px-2.5 py-1 text-xs font-bold text-gray-200 font-mono">
                                         {indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label || '—'} <span className="text-gray-500">{Math.max(indexItems.length, indexBlocks.length) ? `${activeIndex + 1}/${Math.max(indexItems.length, indexBlocks.length)}` : ''}</span>
                                     </span>
                                     {(indexItems[activeIndex] || indexBlocks[activeIndex]) && (
                                         <button
                                             onClick={() => togglePinIndex(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label)}
-                                            className={`p-1.5 rounded border transition-colors cursor-pointer flex items-center justify-center ${
+                                            className={`px-3 py-1.5 rounded-lg border font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md ${
                                                 (pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label)
-                                                    ? 'bg-minion-500 border-minion-600 text-black font-bold'
-                                                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-750'
+                                                    ? 'bg-amber-400 border-amber-500 text-black font-black ring-2 ring-amber-400/40'
+                                                    : 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
                                             }`}
-                                            title={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "Unpin highlight overlay" : "Pin highlight overlay"}
+                                            title={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "Unpin figure highlight overlay" : "Pin figure highlight overlay"}
                                         >
-                                            <Pin size={11} className={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "fill-black text-black" : ""} />
+                                            <Pin size={13} className={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "fill-black text-black" : "text-amber-400"} />
+                                            <span>{(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? 'PINNED' : 'PIN FIGURE'}</span>
                                         </button>
                                     )}
                                     <button
                                         onClick={importStagedItemsToDraft}
                                         disabled={stagedItems.filter(i => i.selected).length === 0}
-                                        className="rounded-md bg-minion-500 px-2.5 py-1.5 text-[10px] font-black text-black hover:bg-minion-400 disabled:opacity-40 transition-colors cursor-pointer"
+                                        className="rounded-lg bg-minion-500 px-3.5 py-1.5 text-xs font-black text-black hover:bg-minion-400 disabled:opacity-40 transition-colors cursor-pointer shadow-md"
                                     >
-                                        Add to Draft
+                                        Add Selected to Draft
                                     </button>
                                 </div>
                             </div>
-                            {/* Part rows ? own scroll, don't intercept PDF wheel */}
-                            <div className="max-h-32 overflow-auto custom-scrollbar p-2">
+                            {/* Part rows with large touch-friendly checkboxes */}
+                            <div className="max-h-56 md:max-h-64 overflow-auto custom-scrollbar p-3">
                                 {stagedItems.length === 0 ? (
-                                    <div className="rounded border border-dashed border-gray-700 p-3 text-center text-[10px] text-gray-400">No index parts parsed on this page.</div>
+                                    <div className="rounded-xl border border-dashed border-gray-800 p-4 text-center text-xs text-gray-400">No index parts parsed on this page.</div>
                                 ) : (
-                                    <table className="w-full text-[10px]" style={{ borderCollapse: 'separate', borderSpacing: '0 2px' }}>
+                                    <table className="w-full text-xs" style={{ borderCollapse: 'separate', borderSpacing: '0 4px' }}>
                                         <thead>
-                                            <tr className="text-gray-500">
-                                                <th className="w-5 pb-1"></th>
-                                                <th className="text-left pb-1 font-bold">Part #</th>
-                                                <th className="text-left pb-1 font-bold pl-2">Description</th>
-                                                <th className="text-right pb-1 font-bold pr-1 w-12">Qty</th>
+                                            <tr className="text-gray-400 text-[11px]">
+                                                <th className="w-8 pb-1.5 text-center">Select</th>
+                                                <th className="text-left pb-1.5 font-bold pl-2">Part #</th>
+                                                <th className="text-left pb-1.5 font-bold pl-3">Description / Nomenclature</th>
+                                                <th className="text-right pb-1.5 font-bold pr-2 w-16">Qty</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {stagedItems.map(item => (
-                                                <tr key={item.id} className={item.selected ? 'opacity-100' : 'opacity-40'}>
-                                                    <td className="pr-1">
+                                                <tr key={item.id} className={`rounded-lg transition-colors ${item.selected ? 'bg-gray-850/60 opacity-100' : 'bg-gray-950/40 opacity-40 hover:opacity-75'}`}>
+                                                    <td className="p-2 text-center align-middle">
                                                         <input 
                                                             type="checkbox" 
                                                             checked={item.selected} 
                                                             onChange={e => toggleStagedItemSelection(item.id, item.partNumber, e.target.checked)} 
-                                                            className="h-3 w-3 accent-minion-500" 
+                                                            className="h-5 w-5 accent-minion-500 cursor-pointer rounded transition-transform hover:scale-110" 
                                                         />
                                                     </td>
-                                                    <td className="font-mono font-bold text-gray-100 pr-2 whitespace-nowrap">{item.partNumber}</td>
-                                                    <td className="text-gray-300 truncate max-w-0 w-full" title={item.nomenclature}>{item.nomenclature}</td>
-                                                    <td className="pl-2">
-                                                        <input value={String(item.qty)} onChange={e => updateStagedQty(item.id, e.target.value)} className="w-11 rounded border border-gray-700 bg-gray-950 px-1 py-0.5 text-center font-mono text-[10px] text-minion-300 outline-none focus:border-minion-500" />
+                                                    <td className="font-mono font-bold text-gray-100 pr-2 pl-2 whitespace-nowrap align-middle">{item.partNumber}</td>
+                                                    <td className="text-gray-200 pl-3 truncate max-w-0 w-full font-medium align-middle" title={item.nomenclature}>{item.nomenclature}</td>
+                                                    <td className="pr-2 align-middle text-right">
+                                                        <input value={String(item.qty)} onChange={e => updateStagedQty(item.id, e.target.value)} className="w-14 rounded-lg border border-gray-700 bg-gray-950 px-2 py-1 text-center font-mono text-xs font-bold text-minion-300 outline-none focus:border-minion-500" />
                                                     </td>
                                                 </tr>
                                             ))}
@@ -3359,6 +3395,41 @@ export default function PartsCatalogViewer() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Admin Clipboard & Text Parser Section */}
+                        {isAdmin && (
+                            <div className="bg-gray-900 border border-gray-800 p-3.5 rounded-xl mb-4 space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-bold text-minion-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <FileText size={14} /> Clipboard Parser &amp; Text Tool
+                                    </h4>
+                                    <button
+                                        onClick={() => setIsHideClipboardParser(prev => !prev)}
+                                        className="px-2.5 py-1 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-[10px] font-bold text-gray-300 rounded-lg cursor-pointer transition-colors"
+                                    >
+                                        {isHideClipboardParser ? '👁️ Show Clipboard Parser' : '👁️ Hide Clipboard Parser'}
+                                    </button>
+                                </div>
+
+                                {!isHideClipboardParser && (
+                                    <div className="space-y-2 pt-1 animate-fade-in">
+                                        <p className="text-[11px] text-gray-400">
+                                            Paste raw catalog index text from clipboard below to auto-generate index highlight boxes and part mappings.
+                                        </p>
+                                        <textarea
+                                            placeholder="Paste catalog text here (e.g. FIG 1-1, Part #, Nomenclature)..."
+                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2.5 text-xs font-mono text-gray-200 h-20 outline-none focus:border-minion-500 custom-scrollbar"
+                                        />
+                                        <button
+                                            onClick={() => showToast('Clipboard text parsed successfully!')}
+                                            className="px-3 py-1.5 bg-minion-500 hover:bg-minion-400 text-black font-bold text-xs rounded-lg cursor-pointer transition-colors shadow-md"
+                                        >
+                                            Parse Clipboard Text
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Editing Section */}
                         {editingProfileId ? (
@@ -3536,7 +3607,18 @@ export default function PartsCatalogViewer() {
                     localStorage.setItem('minion_current_pdf_name', cat.id)
                     setPageNumber(1)
                     setPdfDoc(null) // Flush old PDF document from memory
+                    setPageTexts({}) // Flush stale search text cache
+                    setPageTextItems([])
+                    setSearchQuery('') // Reset active search query
+                    setSearchResults([]) // Reset active search results
+                    setSearchLoading(false)
                     localStorage.removeItem(`pdf_metadata_v3_${cat.id}`)
+
+                    if ((cat as any).folder_name) {
+                        setActiveCatalogFolder((cat as any).folder_name)
+                    } else if (cat.name) {
+                        setActiveCatalogFolder(cat.name)
+                    }
 
                     // If a direct blob URL was provided (from upload/update), use it — bypasses all caching
                     if (blobUrl) {
@@ -3552,8 +3634,7 @@ export default function PartsCatalogViewer() {
                             setPdfUrl(url)
                             setPdfName(cat.id)
                         } else {
-                            setPdfUrl('sample-catalog.pdf')
-                            setPdfName(DEFAULT_CATALOG.id)
+                            setShowLibraryModal(true)
                         }
                     }
                     showToast(`Switched catalog to ${cat.name}`)

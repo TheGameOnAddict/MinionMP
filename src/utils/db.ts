@@ -42,6 +42,24 @@ export interface PDFAnnotation {
     qty?: string | number // For part_box qty
 }
 
+export interface CatalogFolder {
+    id: string
+    name: string
+    description?: string
+    order?: number
+}
+
+export interface CatalogProfile {
+    id: string
+    name: string
+    filename?: string
+    folder_id?: string
+    folder_name?: string
+    pdf_url?: string
+    size?: number
+    updated_at?: string
+}
+
 export interface InventoryItem {
     part_number: string
     nomenclature?: string
@@ -490,7 +508,7 @@ class DbService {
         return false
     }
 
-    private triggerLocalUpdate(type: 'requests' | 'annotations' = 'requests') {
+    private triggerLocalUpdate(type: 'requests' | 'annotations' | 'folders' = 'requests') {
         const event = new CustomEvent('minion_db_update', { detail: { type } })
         window.dispatchEvent(event)
     }
@@ -585,9 +603,79 @@ class DbService {
         }
     }
 
+    // --- CATALOG FOLDERS CRUD ---
+
+    public async getCatalogFolders(): Promise<CatalogFolder[]> {
+        if (this.isCloud && this.supabase) {
+            try {
+                const { data, error } = await this.supabase
+                    .from('minion_catalog_folders')
+                    .select('*')
+                    .order('order', { ascending: true })
+
+                if (!error && data && data.length > 0) return data
+            } catch (e) {
+                console.error('Supabase getCatalogFolders failed:', e)
+            }
+        }
+
+        const local = localStorage.getItem('minion_catalog_folders')
+        if (local) {
+            try {
+                const parsed = JSON.parse(local)
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed
+            } catch (e) {}
+        }
+
+        const defaultFolders: CatalogFolder[] = [
+            { id: 'folder_pa28', name: 'PA-28 WARRIOR', order: 1 },
+            { id: 'folder_pa34', name: 'PA-34 SENECA', order: 2 },
+            { id: 'folder_general', name: 'GENERAL & ENGINES', order: 3 }
+        ]
+        localStorage.setItem('minion_catalog_folders', JSON.stringify(defaultFolders))
+        return defaultFolders
+    }
+
+    public async saveCatalogFolder(folder: CatalogFolder): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                await this.supabase.from('minion_catalog_folders').upsert(folder)
+            } catch (e) {
+                console.error('Supabase saveCatalogFolder failed:', e)
+            }
+        }
+
+        const folders = await this.getCatalogFolders()
+        const idx = folders.findIndex(f => f.id === folder.id)
+        if (idx !== -1) {
+            folders[idx] = folder
+        } else {
+            folders.push(folder)
+        }
+        localStorage.setItem('minion_catalog_folders', JSON.stringify(folders))
+        this.triggerLocalUpdate('folders')
+        return true
+    }
+
+    public async deleteCatalogFolder(folderId: string): Promise<boolean> {
+        if (this.isCloud && this.supabase) {
+            try {
+                await this.supabase.from('minion_catalog_folders').delete().eq('id', folderId)
+            } catch (e) {
+                console.error('Supabase deleteCatalogFolder failed:', e)
+            }
+        }
+
+        const folders = await this.getCatalogFolders()
+        const updated = folders.filter(f => f.id !== folderId)
+        localStorage.setItem('minion_catalog_folders', JSON.stringify(updated))
+        this.triggerLocalUpdate('folders')
+        return true
+    }
+
     // --- CLOUD CATALOGS CRUD & STORAGE ---
 
-    public async getCatalogsFromCloud(): Promise<Array<{ id: string; name: string; filename: string; pdf_url: string; size: number; updated_at: string }> | null> {
+    public async getCatalogsFromCloud(): Promise<Array<{ id: string; name: string; filename: string; folder_id?: string; folder_name?: string; pdf_url: string; size: number; updated_at: string }> | null> {
         if (this.isCloud && this.supabase) {
             try {
                 const { data, error } = await this.supabase
@@ -604,7 +692,7 @@ class DbService {
         return null
     }
 
-    public async uploadCatalogToCloud(catalogId: string, catalogName: string, file: File): Promise<{ success: boolean; pdfUrl?: string }> {
+    public async uploadCatalogToCloud(catalogId: string, catalogName: string, file: File, folderId?: string, folderName?: string): Promise<{ success: boolean; pdfUrl?: string }> {
         if (this.isCloud && this.supabase) {
             try {
                 // 1. Delete any existing storage file for this catalog (handles path changes between versions)
@@ -643,16 +731,20 @@ class DbService {
                 const pdfUrl = urlData?.publicUrl || ''
 
                 // 4. Upsert metadata in minion_catalogs table
+                const payload: any = {
+                    id: catalogId,
+                    name: catalogName,
+                    filename: file.name,
+                    pdf_url: pdfUrl,
+                    size: file.size,
+                    updated_at: new Date().toISOString()
+                }
+                if (folderId) payload.folder_id = folderId
+                if (folderName) payload.folder_name = folderName
+
                 const { error: dbError } = await this.supabase
                     .from('minion_catalogs')
-                    .upsert({
-                        id: catalogId,
-                        name: catalogName,
-                        filename: file.name,
-                        pdf_url: pdfUrl,
-                        size: file.size,
-                        updated_at: new Date().toISOString()
-                    }, {
+                    .upsert(payload, {
                         onConflict: 'id'
                     })
 

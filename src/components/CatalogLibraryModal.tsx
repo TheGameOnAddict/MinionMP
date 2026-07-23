@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { BookOpen, Trash2, Check, X, Plus, FileText, RefreshCw, Lock, UploadCloud } from 'lucide-react'
 import { getCatalogLibrary, fetchMergedCatalogLibrary, CatalogMetadata, getPdfFromIndexedDb, addCatalogToLibrary, removeCatalogFromLibrary, DEFAULT_CATALOG } from '../utils/pdfStore'
 import { adminStore } from '../utils/adminStore'
-import { db } from '../utils/db'
+import { db, CatalogFolder } from '../utils/db'
 
 interface CatalogLibraryModalProps {
     isOpen: boolean
@@ -185,13 +185,21 @@ export default function CatalogLibraryModal({
     onRequestAdminUnlock
 }: CatalogLibraryModalProps) {
     const [catalogs, setCatalogs] = useState<CatalogMetadata[]>(getCatalogLibrary())
+    const [folders, setFolders] = useState<CatalogFolder[]>([])
+    const [selectedFolderId, setSelectedFolderId] = useState<string>('all')
     const [isAdmin, setIsAdmin] = useState(adminStore.getIsUnlocked())
     const [uploading, setUploading] = useState(false)
+    const [newFolderName, setNewFolderName] = useState('')
+    const [showNewFolderInput, setShowNewFolderInput] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const refreshCatalogs = async () => {
-        const merged = await fetchMergedCatalogLibrary()
-        setCatalogs(merged)
+    const refreshCatalogsAndFolders = async () => {
+        const [mergedCats, folderList] = await Promise.all([
+            fetchMergedCatalogLibrary(),
+            db.getCatalogFolders()
+        ])
+        setCatalogs(mergedCats)
+        setFolders(folderList)
     }
 
     useEffect(() => {
@@ -199,9 +207,8 @@ export default function CatalogLibraryModal({
             setIsAdmin(adminStore.getIsUnlocked())
         })
 
-        // Realtime subscription for cloud catalogs
         const unsubscribeRealtime = db.subscribeToCatalogs(() => {
-            refreshCatalogs()
+            refreshCatalogsAndFolders()
         })
 
         return () => {
@@ -212,11 +219,25 @@ export default function CatalogLibraryModal({
 
     useEffect(() => {
         if (isOpen) {
-            refreshCatalogs()
+            refreshCatalogsAndFolders()
         }
     }, [isOpen])
 
     if (!isOpen) return null
+
+    const handleCreateFolder = async () => {
+        if (!newFolderName.trim()) return
+        const newFolder: CatalogFolder = {
+            id: `folder_${Date.now()}`,
+            name: newFolderName.trim().toUpperCase(),
+            order: folders.length + 1
+        }
+        await db.saveCatalogFolder(newFolder)
+        setNewFolderName('')
+        setShowNewFolderInput(false)
+        await refreshCatalogsAndFolders()
+        setSelectedFolderId(newFolder.id)
+    }
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -224,9 +245,14 @@ export default function CatalogLibraryModal({
 
         setUploading(true)
         try {
-            const newMeta = await addCatalogToLibrary(file)
-            await refreshCatalogs()
-            // Create a direct blob URL from the raw file so the viewer loads it immediately
+            const activeFolder = folders.find(f => f.id === selectedFolderId)
+            const newMeta = await addCatalogToLibrary(file, undefined, undefined)
+            
+            if (activeFolder && db.getConfig().isCloud) {
+                await db.uploadCatalogToCloud(newMeta.id, newMeta.name, file, activeFolder.id, activeFolder.name)
+            }
+
+            await refreshCatalogsAndFolders()
             const blobUrl = URL.createObjectURL(file)
             onSelectCatalog(newMeta, blobUrl)
             onClose()
@@ -244,13 +270,16 @@ export default function CatalogLibraryModal({
         try {
             const targetCatalog = catalogs.find(c => c.id === catalogId)
             const catalogDisplayName = targetCatalog?.name || catalogId
-            // Invalidate old page metadata scan cache so new figures and pages are indexed
             localStorage.removeItem(`pdf_metadata_v3_${catalogId}`)
 
+            const activeFolder = folders.find(f => f.id === selectedFolderId)
             const updatedMeta = await addCatalogToLibrary(file, targetCatalog?.name, catalogId)
-            await refreshCatalogs()
 
-            // Create a direct blob URL from the raw File object — bypasses ALL caching
+            if (db.getConfig().isCloud) {
+                await db.uploadCatalogToCloud(catalogId, targetCatalog?.name || catalogId, file, activeFolder?.id, activeFolder?.name)
+            }
+
+            await refreshCatalogsAndFolders()
             const blobUrl = URL.createObjectURL(file)
             onSelectCatalog(updatedMeta, blobUrl)
             onClose()
@@ -265,7 +294,7 @@ export default function CatalogLibraryModal({
 
     const handleDeleteCatalog = async (id: string) => {
         await removeCatalogFromLibrary(id)
-        await refreshCatalogs()
+        await refreshCatalogsAndFolders()
 
         const updated = getCatalogLibrary()
         if (activeCatalogId === id && updated.length > 0) {
@@ -273,18 +302,30 @@ export default function CatalogLibraryModal({
         }
     }
 
+    const filteredCatalogs = catalogs.filter(cat => {
+        if (selectedFolderId === 'all') return true
+        if ((cat as any).folder_id) return (cat as any).folder_id === selectedFolderId
+        // Fallback matching by folder keyword
+        const folderObj = folders.find(f => f.id === selectedFolderId)
+        if (folderObj) {
+            const fName = folderObj.name.toLowerCase()
+            return cat.name.toLowerCase().includes(fName) || cat.id.toLowerCase().includes(fName)
+        }
+        return true
+    })
+
     return (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-6 z-50 animate-fade-in select-none">
-            <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden relative">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 z-50 animate-fade-in select-none">
+            <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-5xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden relative">
                 {/* Header */}
-                <div className="p-6 border-b border-gray-800 flex items-center justify-between shrink-0 bg-gray-950/40">
+                <div className="p-6 border-b border-gray-800 flex items-center justify-between shrink-0 bg-gray-950/60">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-minion-500/10 border border-minion-500/20 flex items-center justify-center text-minion-500">
                             <BookOpen size={22} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-extrabold text-white tracking-tight">Catalog Library</h2>
-                            <p className="text-xs text-gray-400">Select an aircraft manual or catalog to open in the viewer</p>
+                            <h2 className="text-xl font-extrabold text-white tracking-tight">Aircraft Catalog Library</h2>
+                            <p className="text-xs text-gray-400">Select an aircraft folder and catalog to open in the viewer</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -305,55 +346,126 @@ export default function CatalogLibraryModal({
                     </div>
                 </div>
 
+                {/* Folder Carousel Bar */}
+                <div className="px-6 py-3 bg-gray-950/40 border-b border-gray-800 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
+                    <button
+                        onClick={() => setSelectedFolderId('all')}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                            selectedFolderId === 'all'
+                                ? 'bg-minion-500 text-black font-black shadow-md'
+                                : 'bg-gray-850 text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-750'
+                        }`}
+                    >
+                        <span>📁 All Aircraft ({catalogs.length})</span>
+                    </button>
+
+                    {folders.map(folder => {
+                        const count = catalogs.filter(c => (c as any).folder_id === folder.id || c.name.toLowerCase().includes(folder.name.toLowerCase())).length
+                        return (
+                            <button
+                                key={folder.id}
+                                onClick={() => setSelectedFolderId(folder.id)}
+                                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                                    selectedFolderId === folder.id
+                                        ? 'bg-amber-400 text-black font-black shadow-md'
+                                        : 'bg-gray-850 text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-750'
+                                }`}
+                            >
+                                <span>📁 {folder.name} ({count})</span>
+                            </button>
+                        )
+                    })}
+
+                    {isAdmin && (
+                        showNewFolderInput ? (
+                            <div className="flex items-center gap-1.5 shrink-0 animate-fade-in">
+                                <input
+                                    type="text"
+                                    placeholder="FOLDER NAME..."
+                                    value={newFolderName}
+                                    onChange={e => setNewFolderName(e.target.value)}
+                                    className="bg-gray-900 border border-amber-500 text-gray-100 text-xs px-2.5 py-1 rounded-lg outline-none font-mono uppercase"
+                                />
+                                <button
+                                    onClick={handleCreateFolder}
+                                    className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-black font-bold rounded-lg text-xs cursor-pointer"
+                                >
+                                    Add
+                                </button>
+                                <button
+                                    onClick={() => setShowNewFolderInput(false)}
+                                    className="p-1 text-gray-400 hover:text-white text-xs cursor-pointer"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowNewFolderInput(true)}
+                                className="flex items-center gap-1 px-3 py-1.5 border border-dashed border-gray-700 hover:border-amber-400 text-gray-400 hover:text-amber-400 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
+                            >
+                                <Plus size={14} />
+                                <span>New Folder</span>
+                            </button>
+                        )
+                    )}
+                </div>
+
                 {/* Catalog Grid */}
                 <div className="flex-1 overflow-auto p-6 custom-scrollbar">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                        {catalogs.map(cat => (
-                            <CatalogCard
-                                key={cat.id}
-                                catalog={cat}
-                                isActive={activeCatalogId === cat.id}
-                                isAdmin={isAdmin}
-                                onSelect={() => {
-                                    onSelectCatalog(cat)
-                                    onClose()
-                                }}
-                                onDelete={() => handleDeleteCatalog(cat.id)}
-                                onUpdatePdf={(file) => handleUpdateCatalogPdf(cat.id, file)}
-                            />
-                        ))}
-
-                        {/* Admin Upload Card */}
-                        {isAdmin && (
-                            <div
-                                onClick={() => fileInputRef.current?.click()}
-                                className="border-2 border-dashed border-gray-800 hover:border-minion-500/60 bg-gray-950/40 hover:bg-gray-850/40 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 transition-all duration-300 min-h-[260px] cursor-pointer text-center group"
-                            >
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept=".pdf"
-                                    onChange={handleFileUpload}
-                                    className="hidden"
+                    {filteredCatalogs.length === 0 ? (
+                        <div className="py-12 text-center text-gray-500 text-sm italic">
+                            No catalogs found in this folder. {isAdmin && 'Click "Upload New Catalog" below to add one.'}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                            {filteredCatalogs.map(cat => (
+                                <CatalogCard
+                                    key={cat.id}
+                                    catalog={cat}
+                                    isActive={activeCatalogId === cat.id}
+                                    isAdmin={isAdmin}
+                                    onSelect={() => {
+                                        onSelectCatalog(cat)
+                                        onClose()
+                                    }}
+                                    onDelete={() => handleDeleteCatalog(cat.id)}
+                                    onUpdatePdf={(file) => handleUpdateCatalogPdf(cat.id, file)}
                                 />
-                                {uploading ? (
-                                    <RefreshCw className="animate-spin text-minion-500" size={32} />
-                                ) : (
-                                    <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-500 group-hover:text-minion-400 group-hover:border-minion-500/40 transition-colors">
-                                        <Plus size={28} />
+                            ))}
+
+                            {/* Admin Upload Card */}
+                            {isAdmin && (
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="border-2 border-dashed border-gray-800 hover:border-minion-500/60 bg-gray-950/40 hover:bg-gray-850/40 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 transition-all duration-300 min-h-[260px] cursor-pointer text-center group"
+                                >
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={handleFileUpload}
+                                        className="hidden"
+                                    />
+                                    {uploading ? (
+                                        <RefreshCw className="animate-spin text-minion-500" size={32} />
+                                    ) : (
+                                        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-500 group-hover:text-minion-400 group-hover:border-minion-500/40 transition-colors">
+                                            <Plus size={28} />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h4 className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">
+                                            {uploading ? 'Uploading to Supabase Cloud...' : 'Upload New Catalog'}
+                                        </h4>
+                                        <p className="text-[11px] text-gray-500 mt-1 max-w-[180px] leading-relaxed">
+                                            Add a new PDF manual to the cloud (Shared across all devices)
+                                        </p>
                                     </div>
-                                )}
-                                <div>
-                                    <h4 className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">
-                                        {uploading ? 'Uploading to Supabase Cloud...' : 'Upload New Catalog'}
-                                    </h4>
-                                    <p className="text-[11px] text-gray-500 mt-1 max-w-[180px] leading-relaxed">
-                                        Add a new PDF manual to the cloud (Shared across all devices)
-                                    </p>
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
