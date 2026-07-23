@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
-import { getPdfFromIndexedDb, fetchMergedCatalogLibrary, addCatalogToLibrary, CatalogMetadata } from '../utils/pdfStore'
+import { fetchMergedCatalogLibrary, addCatalogToLibrary, CatalogMetadata, loadCatalogPdfBlob } from '../utils/pdfStore'
 import { extractIPCIndexBlocks, ParsedIndexBlock, ParsedItem } from '../utils/parser'
 import { adminStore } from '../utils/adminStore'
 import AdminPasswordModal from './AdminPasswordModal'
@@ -1062,7 +1062,7 @@ export default function PartsCatalogViewer() {
         window.dispatchEvent(new CustomEvent('minion_draft_update', { detail: { sender: 'catalog' } }))
     }, [draftItems])
 
-    // Restore stored PDF from Cloud / IndexedDB on page load
+    // Restore stored PDF from Cloud / IndexedDB on page load (Offline-First Instant Load)
     useEffect(() => {
         const loadStoredPdf = async () => {
             const storedName = localStorage.getItem('minion_current_pdf_name')
@@ -1077,16 +1077,9 @@ export default function PartsCatalogViewer() {
                     if ((match as any).folder_name) {
                         setActiveCatalogFolder((match as any).folder_name)
                     }
-                    if (match.pdf_url) {
-                        setPdfUrl(`${match.pdf_url}?t=${Date.now()}`)
-                        setPdfName(match.id)
-                        localStorage.setItem('minion_current_pdf_name', match.id)
-                        return
-                    }
-                    const storedBlob = await getPdfFromIndexedDb(match.id)
-                    if (storedBlob) {
-                        const url = URL.createObjectURL(storedBlob)
-                        setPdfUrl(url)
+                    const pdfObjectUrl = await loadCatalogPdfBlob(match.id, match.pdf_url)
+                    if (pdfObjectUrl) {
+                        setPdfUrl(pdfObjectUrl)
                         setPdfName(match.id)
                         localStorage.setItem('minion_current_pdf_name', match.id)
                         return
@@ -3633,14 +3626,10 @@ export default function PartsCatalogViewer() {
                     if (blobUrl) {
                         setPdfUrl(blobUrl)
                         setPdfName(cat.id)
-                    } else if (cat.pdf_url) {
-                        setPdfUrl(`${cat.pdf_url}?t=${Date.now()}`)
-                        setPdfName(cat.id)
                     } else {
-                        const blob = await getPdfFromIndexedDb(cat.id)
-                        if (blob) {
-                            const url = URL.createObjectURL(blob)
-                            setPdfUrl(url)
+                        const pdfObjectUrl = await loadCatalogPdfBlob(cat.id, cat.pdf_url)
+                        if (pdfObjectUrl) {
+                            setPdfUrl(pdfObjectUrl)
                             setPdfName(cat.id)
                         } else {
                             setShowLibraryModal(true)
