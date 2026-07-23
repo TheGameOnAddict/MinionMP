@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
-import { savePdfToIndexedDb, getPdfFromIndexedDb, DEFAULT_CATALOG } from '../utils/pdfStore'
+import { savePdfToIndexedDb, getPdfFromIndexedDb, fetchMergedCatalogLibrary, CatalogMetadata, DEFAULT_CATALOG } from '../utils/pdfStore'
 import { extractIPCIndexBlocks, ParsedIndexBlock, ParsedItem } from '../utils/parser'
 import { adminStore } from '../utils/adminStore'
 import AdminPasswordModal from './AdminPasswordModal'
@@ -790,7 +790,7 @@ export default function PartsCatalogViewer() {
         window.dispatchEvent(new CustomEvent('minion_draft_update', { detail: { sender: 'catalog' } }))
     }, [draftItems])
 
-    // Restore stored PDF from IndexedDB on page load
+    // Restore stored PDF from Cloud / IndexedDB on page load
     useEffect(() => {
         const loadStoredPdf = async () => {
             const storedName = localStorage.getItem('minion_current_pdf_name') || DEFAULT_CATALOG.id
@@ -800,6 +800,16 @@ export default function PartsCatalogViewer() {
                 return
             }
             try {
+                // Check if catalog exists in merged catalog library with a cloud pdf_url
+                const library = await fetchMergedCatalogLibrary()
+                const match = library.find((c: CatalogMetadata) => c.id === storedName)
+
+                if (match?.pdf_url) {
+                    setPdfUrl(match.pdf_url)
+                    setPdfName(match.id)
+                    return
+                }
+
                 const storedBlob = await getPdfFromIndexedDb(storedName)
                 if (storedBlob) {
                     const url = URL.createObjectURL(storedBlob)
@@ -3039,6 +3049,9 @@ export default function PartsCatalogViewer() {
                     if (cat.id === DEFAULT_CATALOG.id) {
                         setPdfUrl('sample-catalog.pdf')
                         setPdfName(DEFAULT_CATALOG.id)
+                    } else if (cat.pdf_url) {
+                        setPdfUrl(cat.pdf_url)
+                        setPdfName(cat.id)
                     } else {
                         const blob = await getPdfFromIndexedDb(cat.id)
                         if (blob) {
