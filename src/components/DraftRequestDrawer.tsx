@@ -119,10 +119,21 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
     }
 
     // Form inputs
+    const mechanicInputRef = useRef<HTMLInputElement>(null)
     const [mechanicName, setMechanicName] = useState(() => localStorage.getItem('minion_draft_mechanic') || '')
     const [tail, setTail] = useState(() => localStorage.getItem('minion_draft_tail') || '')
     const [discrepancy, setDiscrepancy] = useState('')
     const [orderNotes, setOrderNotes] = useState('')
+
+    const handleClearMechanicInfo = () => {
+        setMechanicName('')
+        setTail('')
+        setDiscrepancy('')
+        localStorage.removeItem('minion_draft_mechanic')
+        localStorage.removeItem('minion_draft_tail')
+        showToast('Mechanic & Aircraft Info cleared')
+        setTimeout(() => mechanicInputRef.current?.focus(), 50)
+    }
 
     // Manual Entry
     const [showManualEntry, setShowManualEntry] = useState(true)
@@ -382,28 +393,54 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                 </div>
 
                 {/* Form Inputs */}
-                <div className="p-4 border-b border-gray-800 space-y-2 select-none">
-                    <input
-                        className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-minion-500 outline-none"
-                        placeholder="Mechanic Name"
-                        value={mechanicName}
-                        onChange={e => setMechanicName(e.target.value)}
-                    />
+                <div className="p-3.5 border-b border-gray-800 space-y-2 select-none bg-gray-950/40">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                            <span>📋 Mechanic &amp; Aircraft Info</span>
+                        </span>
+                        {(mechanicName || tail || discrepancy) && (
+                            <button
+                                onClick={handleClearMechanicInfo}
+                                className="text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                                title="Clear mechanic, tail number, and discrepancy for next user"
+                            >
+                                <span>🧹 Clear Info</span>
+                            </button>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase text-amber-400/80 mb-0.5">Mechanic Name</label>
+                        <input
+                            ref={mechanicInputRef}
+                            className="w-full bg-gray-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 outline-none placeholder-gray-600 transition-colors"
+                            placeholder="e.g. John Doe"
+                            value={mechanicName}
+                            onChange={e => setMechanicName(e.target.value)}
+                        />
+                    </div>
+
                     <div className="flex gap-2">
-                        <input
-                            className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-minion-500 outline-none uppercase font-mono"
-                            placeholder="Tail Number"
-                            value={tail}
-                            onChange={e => setTail(e.target.value)}
-                            maxLength={6}
-                        />
-                        <input
-                            className="w-28 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-200 focus:ring-1 focus:ring-minion-500 outline-none font-mono"
-                            placeholder="Discrepancy #"
-                            value={discrepancy}
-                            onChange={e => setDiscrepancy(e.target.value)}
-                            type="number"
-                        />
+                        <div className="flex-1">
+                            <label className="block text-[10px] font-bold uppercase text-amber-400/80 mb-0.5">Tail Number</label>
+                            <input
+                                className="w-full bg-gray-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 outline-none uppercase font-mono placeholder-gray-600 transition-colors"
+                                placeholder="N12345"
+                                value={tail}
+                                onChange={e => setTail(e.target.value)}
+                                maxLength={6}
+                            />
+                        </div>
+                        <div className="w-28">
+                            <label className="block text-[10px] font-bold uppercase text-amber-400/80 mb-0.5">Discrepancy #</label>
+                            <input
+                                className="w-full bg-gray-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 outline-none font-mono placeholder-gray-600 transition-colors"
+                                placeholder="101"
+                                value={discrepancy}
+                                onChange={e => setDiscrepancy(e.target.value)}
+                                type="number"
+                            />
+                        </div>
                     </div>
                 </div>
 
