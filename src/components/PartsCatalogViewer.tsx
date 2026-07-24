@@ -3368,7 +3368,10 @@ export default function PartsCatalogViewer() {
                 </div>
                     {tool === 'index' && (
                         isIndexEditorMinimized ? (
-                            <div className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in transition-all duration-300 ease-in-out backdrop-blur-md select-none`}>
+                            <div
+                                style={{ top: indexEditorPosition === 'top' ? '4rem' : 'calc(100vh - 100% - 1rem)' }}
+                                className={`fixed ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in transition-all duration-500 ease-in-out backdrop-blur-md select-none`}
+                            >
                                 <div className="flex items-center gap-3 text-xs font-bold text-gray-200 font-mono">
                                     <span className="text-minion-400 font-black flex items-center gap-1.5">
                                         <ListTree size={14} /> Index {activeIndex + 1}/{Math.max(indexItems.length, indexBlocks.length)}:
@@ -3404,7 +3407,10 @@ export default function PartsCatalogViewer() {
                                 </div>
                             </div>
                         ) : (
-                            <div className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ease-in-out`}>
+                            <div
+                                style={{ top: indexEditorPosition === 'top' ? '4rem' : 'calc(100vh - 100% - 1rem)' }}
+                                className={`fixed ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-500 ease-in-out`}
+                            >
                                 {/* Header */}
                                 <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
                                     <div className="min-w-0 flex items-center gap-3">
