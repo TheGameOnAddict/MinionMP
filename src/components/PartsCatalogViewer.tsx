@@ -610,6 +610,24 @@ export default function PartsCatalogViewer() {
     // Index Editor Panel Docking Position & Minimize State
     const [indexEditorPosition, setIndexEditorPosition] = useState<'bottom' | 'top'>('bottom')
     const [isIndexEditorMinimized, setIsIndexEditorMinimized] = useState<boolean>(false)
+    const [dockAnimState, setDockAnimState] = useState<'idle' | 'sliding-out' | 'sliding-in'>('idle')
+
+    const toggleDockPosition = (targetPos?: 'top' | 'bottom') => {
+        const nextPos = targetPos || (indexEditorPosition === 'bottom' ? 'top' : 'bottom')
+        if (nextPos === indexEditorPosition) return
+
+        // Step 1: Slide out right
+        setDockAnimState('sliding-out')
+
+        // Step 2: Swap position to top/bottom & prepare slide-in from left
+        setTimeout(() => {
+            setIndexEditorPosition(nextPos)
+            setDockAnimState('sliding-in')
+            setTimeout(() => {
+                setDockAnimState('idle')
+            }, 30)
+        }, 180)
+    }
 
     // Multi-Page Print & Options State
     const [showPrintModal, setShowPrintModal] = useState(false)
@@ -2019,9 +2037,12 @@ export default function PartsCatalogViewer() {
         }
 
         setActiveIndex(bounded)
-        // Smart Auto-Docking: if index is in the lower half of page list, dock panel to top to prevent obscuring view
+        // Smart Auto-Docking: if index is in lower half of page list, dock panel to top to prevent obscuring view
         if (count > 1) {
-            setIndexEditorPosition(bounded / count >= 0.5 ? 'top' : 'bottom')
+            const targetPos = bounded / count >= 0.5 ? 'top' : 'bottom'
+            if (targetPos !== indexEditorPosition) {
+                toggleDockPosition(targetPos)
+            }
         }
         if (source.length > bounded) {
             const block = source[bounded]
@@ -3369,8 +3390,13 @@ export default function PartsCatalogViewer() {
                     {tool === 'index' && (
                         isIndexEditorMinimized ? (
                             <div
-                                style={{ top: indexEditorPosition === 'top' ? '4rem' : 'calc(100vh - 100% - 1rem)' }}
-                                className={`fixed ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in transition-all duration-500 ease-in-out backdrop-blur-md select-none`}
+                                className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in backdrop-blur-md select-none ${
+                                    dockAnimState === 'sliding-out'
+                                        ? 'translate-x-full opacity-0 pointer-events-none transition-all duration-200 ease-in'
+                                        : dockAnimState === 'sliding-in'
+                                        ? '-translate-x-12 opacity-0 transition-none'
+                                        : 'translate-x-0 opacity-100 transition-all duration-300 ease-out'
+                                }`}
                             >
                                 <div className="flex items-center gap-3 text-xs font-bold text-gray-200 font-mono">
                                     <span className="text-minion-400 font-black flex items-center gap-1.5">
@@ -3382,7 +3408,7 @@ export default function PartsCatalogViewer() {
 
                                 <div className="flex items-center gap-2">
                                     <button
-                                        onClick={() => setIndexEditorPosition(prev => prev === 'bottom' ? 'top' : 'bottom')}
+                                        onClick={() => toggleDockPosition()}
                                         className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                                         title={indexEditorPosition === 'bottom' ? "Dock panel at top of screen to see lower page contents" : "Dock panel at bottom of screen"}
                                     >
@@ -3408,8 +3434,13 @@ export default function PartsCatalogViewer() {
                             </div>
                         ) : (
                             <div
-                                style={{ top: indexEditorPosition === 'top' ? '4rem' : 'calc(100vh - 100% - 1rem)' }}
-                                className={`fixed ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-500 ease-in-out`}
+                                className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in ${
+                                    dockAnimState === 'sliding-out'
+                                        ? 'translate-x-full opacity-0 pointer-events-none transition-all duration-200 ease-in'
+                                        : dockAnimState === 'sliding-in'
+                                        ? '-translate-x-12 opacity-0 transition-none'
+                                        : 'translate-x-0 opacity-100 transition-all duration-300 ease-out'
+                                }`}
                             >
                                 {/* Header */}
                                 <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
@@ -3425,7 +3456,7 @@ export default function PartsCatalogViewer() {
                                     <div className="flex items-center gap-2 shrink-0">
                                         {/* Dock Position Toggle Button */}
                                         <button
-                                            onClick={() => setIndexEditorPosition(prev => prev === 'bottom' ? 'top' : 'bottom')}
+                                            onClick={() => toggleDockPosition()}
                                             className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                                             title={indexEditorPosition === 'bottom' ? "Dock panel at top of screen to see lower page contents" : "Dock panel at bottom of screen"}
                                         >
