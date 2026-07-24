@@ -4,7 +4,7 @@ import {
     Search, RefreshCw, FolderOpen, ChevronDown, ChevronRight,
     Check, XCircle, Timer, FileDown,
     Settings2, X, Download, Upload, ArrowLeft, Info, HelpCircle,
-    BookOpen, Plus, Printer, MessageSquare, Edit3
+    BookOpen, Plus, Printer, MessageSquare, Edit3, Smartphone
 } from 'lucide-react'
 import ExcelJS from 'exceljs'
 import { playDing } from '../utils/sound'
@@ -1080,13 +1080,9 @@ alter publication supabase_realtime add table minion_annotations;
             {/* Printable Pick Ticket Modal */}
             {printTicketReq && (() => {
                 const host = window.location.origin + window.location.pathname
-                let payloadBase64 = ''
-                try {
-                    payloadBase64 = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(printTicketReq)))))
-                } catch (e) {}
-
-                const fulfillUrl = `${host}#/fulfill?id=${printTicketReq.id}${payloadBase64 ? `&payload=${payloadBase64}` : ''}`
-                const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(fulfillUrl)}`
+                // Low-density clean QR code URL (~50 chars) for instant scan
+                const fulfillUrl = `${host}#/fulfill?id=${printTicketReq.id}`
+                const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(fulfillUrl)}`
 
                 const handlePrintPickTicket = () => {
                     const itemsHtml = (printTicketReq.items || []).map((item: any) => `
@@ -1193,6 +1189,13 @@ alter publication supabase_realtime add table minion_annotations;
                                     <h3 className="text-lg font-extrabold text-white">Parts Pick Ticket Preview</h3>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => navigate(`/fulfill?id=${printTicketReq.id}`)}
+                                        className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-minion-400 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow cursor-pointer transition-colors border border-gray-700"
+                                        title="Open Mobile Ticket Fulfillment View"
+                                    >
+                                        <Smartphone size={14} /> Mobile Ticket
+                                    </button>
                                     <button
                                         onClick={handlePrintPickTicket}
                                         className="px-4 py-2 bg-minion-500 hover:bg-minion-400 text-black font-bold rounded-xl text-xs flex items-center gap-1.5 shadow cursor-pointer transition-colors"
