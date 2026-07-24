@@ -1078,126 +1078,180 @@ alter publication supabase_realtime add table minion_annotations;
             </div>
 
             {/* Printable Pick Ticket Modal */}
-            {printTicketReq && (
-                <div className="printable-ticket-wrapper fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in select-none">
-                    {/* Modal container - hidden during print */}
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden no-print">
-                        {/* Modal Header */}
-                        <div className="flex items-center justify-between pb-4 border-b border-gray-800 shrink-0">
-                            <div className="flex items-center gap-2">
-                                <Printer className="text-minion-500" size={20} />
-                                <h3 className="text-lg font-extrabold text-white">Parts Pick Ticket Preview</h3>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => window.print()}
-                                    className="px-4 py-2 bg-minion-500 hover:bg-minion-400 text-black font-bold rounded-xl text-xs flex items-center gap-1.5 shadow cursor-pointer transition-colors"
-                                >
-                                    <Printer size={14} /> Print Ticket
-                                </button>
-                                <button
-                                    onClick={() => setPrintTicketReq(null)}
-                                    className="p-2 hover:bg-gray-800 rounded-xl text-gray-400 hover:text-white cursor-pointer"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-                        </div>
+            {printTicketReq && (() => {
+                const handlePrintPickTicket = () => {
+                    const itemsHtml = (printTicketReq.items || []).map((item: any) => `
+                        <tr style="border-bottom: 1px solid #e5e7eb;">
+                            <td style="padding: 10px; text-align: center; font-size: 14px; font-weight: bold;">□</td>
+                            <td style="padding: 10px; font-family: monospace; font-weight: bold; font-size: 13px;">${item.part_number}</td>
+                            <td style="padding: 10px; font-size: 12px;">${item.nomenclature || '—'}</td>
+                            <td style="padding: 10px; text-align: center; font-family: monospace; font-size: 11px;">${item.group || '—'}</td>
+                            <td style="padding: 10px; text-align: center; font-weight: bold; font-size: 14px;">${item.qty}</td>
+                            <td style="padding: 10px; text-align: center; color: #9ca3af;">______</td>
+                        </tr>
+                    `).join('')
 
-                        {/* Ticket Paper Area (Print Target) */}
-                        <div className="flex-1 overflow-auto p-6 bg-white text-black rounded-xl my-4 font-sans select-text shadow-inner custom-scrollbar printable-ticket-content">
-                            <style>{`
-                                @media print {
-                                    body * {
-                                        visibility: hidden !important;
-                                    }
-                                    .printable-ticket-wrapper {
-                                        position: absolute !important;
-                                        left: 0 !important;
-                                        top: 0 !important;
-                                        width: 100% !important;
-                                        height: auto !important;
-                                        background: white !important;
-                                        visibility: visible !important;
-                                        padding: 0 !important;
-                                        margin: 0 !important;
-                                    }
-                                    .printable-ticket-wrapper .no-print {
-                                        display: none !important;
-                                    }
-                                    .printable-ticket-content, .printable-ticket-content * {
-                                        visibility: visible !important;
-                                        color: black !important;
-                                    }
-                                    .printable-ticket-content {
-                                        position: absolute !important;
-                                        left: 0 !important;
-                                        top: 0 !important;
-                                        width: 100% !important;
-                                        height: auto !important;
-                                        overflow: visible !important;
-                                        padding: 24px !important;
-                                        box-shadow: none !important;
-                                        border: none !important;
-                                        background: white !important;
-                                    }
-                                }
-                            `}</style>
+                    const printWin = window.open('', '_blank', 'width=850,height=950')
+                    if (!printWin) {
+                        window.print()
+                        return
+                    }
 
-                            <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-start">
+                    printWin.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>Parts Pick Ticket - #${printTicketReq.id.slice(-5)}</title>
+                            <style>
+                                @page { size: auto; margin: 12mm; }
+                                body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #000; background: #fff; margin: 0; }
+                                * { box-sizing: border-box; }
+                                .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+                                .title { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; margin: 0; color: #000; }
+                                .subtitle { font-size: 11px; font-weight: 700; color: #4b5563; margin-top: 2px; }
+                                .meta-box { background: #f3f4f6; border-radius: 8px; padding: 12px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; }
+                                .meta-label { color: #6b7280; font-size: 10px; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 2px; }
+                                .meta-val { font-weight: bold; font-size: 13px; color: #000; }
+                                table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+                                th { border-bottom: 2px solid #000; text-align: left; padding: 10px 8px; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase; }
+                                .footer { border-top: 1px solid #d1d5db; padding-top: 16px; margin-top: 32px; display: flex; justify-content: space-between; font-size: 11px; color: #4b5563; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
                                 <div>
-                                    <h1 className="text-2xl font-black tracking-tight text-black">MINION MP — PARTS PICK TICKET</h1>
-                                    <p className="text-xs font-bold text-gray-700">AIRCRAFT PARTS REQUISITION & PICK LIST</p>
+                                    <h1 class="title">MINION MP — PARTS PICK TICKET</h1>
+                                    <div class="subtitle">AIRCRAFT PARTS REQUISITION & PICK LIST</div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-lg font-mono font-bold">#{printTicketReq.id.slice(-5)}</div>
-                                    <div className="text-xs text-gray-600">{new Date(printTicketReq.timestamp).toLocaleString()}</div>
+                                <div style="text-align: right;">
+                                    <div style="font-family: monospace; font-size: 16px; font-weight: bold;">#${printTicketReq.id.slice(-5)}</div>
+                                    <div style="font-size: 11px; color: #6b7280;">${new Date(printTicketReq.timestamp).toLocaleString()}</div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-100 rounded-lg text-xs font-semibold">
-                                <div><span className="text-gray-500 uppercase text-[10px] block">AIRCRAFT TAIL:</span> <span className="text-sm font-bold">{printTicketReq.tail}</span></div>
-                                <div><span className="text-gray-500 uppercase text-[10px] block">REQUESTING MECHANIC:</span> <span className="text-sm font-bold">{printTicketReq.mechanic}</span></div>
-                                <div className="col-span-2"><span className="text-gray-500 uppercase text-[10px] block">DISCREPANCY:</span> <span>{printTicketReq.discrepancy || 'Not specified'}</span></div>
-                                {printTicketReq.notes && (
-                                    <div className="col-span-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-900"><span className="font-bold">ORDER NOTES:</span> {printTicketReq.notes}</div>
-                                )}
+                            <div class="meta-box">
+                                <div><span class="meta-label">AIRCRAFT TAIL</span><span class="meta-val">${printTicketReq.tail}</span></div>
+                                <div><span class="meta-label">REQUESTING MECHANIC</span><span class="meta-val">${printTicketReq.mechanic}</span></div>
+                                <div style="grid-column: span 2;"><span class="meta-label">DISCREPANCY</span><span class="meta-val">${printTicketReq.discrepancy || 'Not specified'}</span></div>
+                                ${printTicketReq.notes ? `<div style="grid-column: span 2; background: #fefce8; border: 1px solid #fef08a; padding: 8px; border-radius: 6px; color: #713f12;"><span style="font-weight: bold;">ORDER NOTES:</span> ${printTicketReq.notes}</div>` : ''}
                             </div>
 
-                            <table className="w-full text-xs text-left border-collapse mb-6">
+                            <table>
                                 <thead>
-                                    <tr className="border-b-2 border-black text-[11px] uppercase font-bold text-gray-700">
-                                        <th className="py-2 w-8 text-center">[✓]</th>
-                                        <th className="py-2">PART NUMBER</th>
-                                        <th className="py-2">NOMENCLATURE</th>
-                                        <th className="py-2 text-center">INDEX / LOC</th>
-                                        <th className="py-2 text-center">QTY REQ</th>
-                                        <th className="py-2 text-center">QTY PICKED</th>
+                                    <tr>
+                                        <th style="width: 36px; text-align: center;">[✓]</th>
+                                        <th>PART NUMBER</th>
+                                        <th>NOMENCLATURE</th>
+                                        <th style="text-align: center;">INDEX / LOC</th>
+                                        <th style="text-align: center;">QTY REQ</th>
+                                        <th style="text-align: center;">QTY PICKED</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(printTicketReq.items || []).map((item: any, idx: number) => (
-                                        <tr key={idx} className="border-b border-gray-300 py-2">
-                                            <td className="py-2 text-center font-bold text-base">□</td>
-                                            <td className="py-2 font-mono font-bold">{item.part_number}</td>
-                                            <td className="py-2">{item.nomenclature}</td>
-                                            <td className="py-2 text-center font-mono text-xs">{item.group || '—'}</td>
-                                            <td className="py-2 text-center font-bold text-sm">{item.qty}</td>
-                                            <td className="py-2 text-center text-gray-400">______</td>
-                                        </tr>
-                                    ))}
+                                    ${itemsHtml}
                                 </tbody>
                             </table>
 
-                            <div className="mt-8 pt-4 border-t border-gray-300 flex justify-between text-[11px] text-gray-600 font-medium">
+                            <div class="footer">
                                 <div>Picked By: ___________________________</div>
                                 <div>Date / Time: _______________________</div>
                                 <div>Received By: ________________________</div>
                             </div>
+
+                            <script>
+                                window.onload = function() {
+                                    window.print();
+                                    setTimeout(function() { window.close(); }, 500);
+                                };
+                            </script>
+                        </body>
+                        </html>
+                    `)
+                    printWin.document.close()
+                }
+
+                return (
+                    <div className="printable-ticket-wrapper fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in select-none">
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden">
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between pb-4 border-b border-gray-800 shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <Printer className="text-minion-500" size={20} />
+                                    <h3 className="text-lg font-extrabold text-white">Parts Pick Ticket Preview</h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handlePrintPickTicket}
+                                        className="px-4 py-2 bg-minion-500 hover:bg-minion-400 text-black font-bold rounded-xl text-xs flex items-center gap-1.5 shadow cursor-pointer transition-colors"
+                                    >
+                                        <Printer size={14} /> Print Ticket
+                                    </button>
+                                    <button
+                                        onClick={() => setPrintTicketReq(null)}
+                                        className="p-2 hover:bg-gray-800 rounded-xl text-gray-400 hover:text-white cursor-pointer"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Ticket Paper Preview */}
+                            <div className="flex-1 overflow-auto p-6 bg-white text-black rounded-xl my-4 font-sans select-text shadow-inner custom-scrollbar">
+                                <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-start">
+                                    <div>
+                                        <h1 className="text-2xl font-black tracking-tight text-black">MINION MP — PARTS PICK TICKET</h1>
+                                        <p className="text-xs font-bold text-gray-700">AIRCRAFT PARTS REQUISITION &amp; PICK LIST</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-lg font-mono font-bold">#{printTicketReq.id.slice(-5)}</div>
+                                        <div className="text-xs text-gray-600">{new Date(printTicketReq.timestamp).toLocaleString()}</div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-100 rounded-lg text-xs font-semibold">
+                                    <div><span className="text-gray-500 uppercase text-[10px] block">AIRCRAFT TAIL:</span> <span className="text-sm font-bold">{printTicketReq.tail}</span></div>
+                                    <div><span className="text-gray-500 uppercase text-[10px] block">REQUESTING MECHANIC:</span> <span className="text-sm font-bold">{printTicketReq.mechanic}</span></div>
+                                    <div className="col-span-2"><span className="text-gray-500 uppercase text-[10px] block">DISCREPANCY:</span> <span>{printTicketReq.discrepancy || 'Not specified'}</span></div>
+                                    {printTicketReq.notes && (
+                                        <div className="col-span-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-900"><span className="font-bold">ORDER NOTES:</span> {printTicketReq.notes}</div>
+                                    )}
+                                </div>
+
+                                <table className="w-full text-xs text-left border-collapse mb-6">
+                                    <thead>
+                                        <tr className="border-b-2 border-black text-[11px] uppercase font-bold text-gray-700">
+                                            <th className="py-2 w-8 text-center">[✓]</th>
+                                            <th className="py-2">PART NUMBER</th>
+                                            <th className="py-2">NOMENCLATURE</th>
+                                            <th className="py-2 text-center">INDEX / LOC</th>
+                                            <th className="py-2 text-center">QTY REQ</th>
+                                            <th className="py-2 text-center">QTY PICKED</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(printTicketReq.items || []).map((item: any, idx: number) => (
+                                            <tr key={idx} className="border-b border-gray-300 py-2">
+                                                <td className="py-2 text-center font-bold text-base">□</td>
+                                                <td className="py-2 font-mono font-bold">{item.part_number}</td>
+                                                <td className="py-2">{item.nomenclature}</td>
+                                                <td className="py-2 text-center font-mono text-xs">{item.group || '—'}</td>
+                                                <td className="py-2 text-center font-bold text-sm">{item.qty}</td>
+                                                <td className="py-2 text-center text-gray-400">______</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+
+                                <div className="mt-8 pt-4 border-t border-gray-300 flex justify-between text-[11px] text-gray-600 font-medium">
+                                    <div>Picked By: ___________________________</div>
+                                    <div>Date / Time: _______________________</div>
+                                    <div>Received By: ________________________</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            })()}
 
             {/* JSON Backup Manager Modal */}
             {showBackupModal && (
