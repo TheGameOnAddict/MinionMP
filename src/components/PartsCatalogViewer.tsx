@@ -2688,12 +2688,12 @@ export default function PartsCatalogViewer() {
                 {/* PDF Viewer Pane */}
                 <div className="flex-1 flex flex-col min-w-0 bg-gray-900 border-r border-gray-800 relative">
                     {/* Tool Bar */}
-                    <div className="h-12 bg-gray-900/60 border-b border-gray-850 px-4 flex items-center justify-between select-none">
-                        <div className="flex items-center gap-1 flex-1 justify-start">
-                            {/* Navigation */}
+                    <div className="h-12 bg-gray-900/60 border-b border-gray-850 px-4 flex items-center justify-between gap-4 select-none relative">
+                        {/* Left Section: Sidebar Toggle */}
+                        <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setShowOutlineSidebar(!showOutlineSidebar)}
-                                className={`p-1.5 rounded transition-colors cursor-pointer flex items-center justify-center mr-1 ${
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
                                     showOutlineSidebar
                                         ? 'bg-minion-500 text-black font-bold'
                                         : 'hover:bg-gray-800 text-gray-400 hover:text-white'
@@ -2702,39 +2702,69 @@ export default function PartsCatalogViewer() {
                             >
                                 <BookOpen size={15} />
                             </button>
-                            <button
-                                onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
-                                disabled={pageNumber <= 1}
-                                className="p-1.5 hover:bg-gray-800 rounded text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <div className="flex items-center gap-1 text-xs text-gray-400 font-mono px-1">
-                                <span>Page</span>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={numPages || 1}
-                                    value={pageNumber}
-                                    onChange={e => {
-                                        const p = parseInt(e.target.value)
-                                        if (p >= 1 && p <= numPages) {
-                                            setPageNumber(p)
-                                        }
-                                    }}
-                                    className="w-10 bg-gray-800 border border-gray-700 text-center text-minion-450 font-bold rounded py-0.5 outline-none focus:ring-1 focus:ring-minion-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                />
-                                <span>/ {numPages}</span>
-                            </div>
-                            <button
-                                onClick={() => setPageNumber(prev => Math.min(numPages, prev + 1))}
-                                disabled={pageNumber >= numPages}
-                                className="p-1.5 hover:bg-gray-800 rounded text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
+                        </div>
 
-                            <div className="h-4 w-px bg-gray-800 mx-2" />
+                        {/* Center Section: Page Navigation, Zoom, and Scan Badge */}
+                        <div className="flex items-center justify-center gap-2 bg-gray-950/70 px-3 py-1 rounded-xl border border-gray-800 shadow-inner">
+                            {/* Page Navigation Stepper */}
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
+                                    disabled={pageNumber <= 1}
+                                    className="p-1 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                    title="Previous Page"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <div className="flex items-center gap-1 text-xs text-gray-300 font-mono px-1 font-bold">
+                                    <span>Page</span>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={numPages || 1}
+                                        value={pageNumber}
+                                        onChange={e => {
+                                            const p = parseInt(e.target.value)
+                                            if (p >= 1 && p <= numPages) {
+                                                setPageNumber(p)
+                                            }
+                                        }}
+                                        className="w-11 bg-gray-850 border border-gray-700 text-center text-minion-450 font-black rounded-lg py-0.5 outline-none focus:ring-1 focus:ring-minion-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <span>/ {numPages}</span>
+                                </div>
+                                <button
+                                    onClick={() => setPageNumber(prev => Math.min(numPages, prev + 1))}
+                                    disabled={pageNumber >= numPages}
+                                    className="p-1 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                    title="Next Page"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+
+                            <div className="h-4 w-px bg-gray-800 mx-1" />
+
+                            {/* Zoom Controls */}
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setScale(prev => Math.max(0.6, prev - 0.15))}
+                                    className="p-1 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white cursor-pointer"
+                                    title="Zoom Out"
+                                >
+                                    <ZoomOut size={15} />
+                                </button>
+                                <span className="text-xs text-gray-300 px-1 font-mono font-bold">{Math.round(scale * 100)}%</span>
+                                <button
+                                    onClick={() => setScale(prev => Math.min(3, prev + 0.15))}
+                                    className="p-1 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white cursor-pointer"
+                                    title="Zoom In"
+                                >
+                                    <ZoomIn size={15} />
+                                </button>
+                            </div>
+
+                            <div className="h-4 w-px bg-gray-800 mx-1" />
 
                             {/* Scan status badge */}
                             <button
@@ -2750,7 +2780,7 @@ export default function PartsCatalogViewer() {
                                     showToast('Rescanning PDF metadata...')
                                 }}
                                 title={`Scan status: ${scanStatus}. Click to force rescan.`}
-                                className={`text-[9px] font-mono px-1.5 py-0.5 rounded border cursor-pointer transition-colors ${
+                                className={`text-[9px] font-mono px-1.5 py-0.5 rounded-lg border cursor-pointer transition-colors ${
                                     Object.keys(pdfMetadata).length > 0
                                         ? 'border-green-700 bg-green-900/20 text-green-500 hover:bg-green-900/40'
                                         : 'border-yellow-700 bg-yellow-900/20 text-yellow-500 hover:bg-yellow-900/40 animate-pulse'
@@ -2760,24 +2790,10 @@ export default function PartsCatalogViewer() {
                                     ? `✓ ${Object.keys(pdfMetadata).length} keys`
                                     : `⟳ ${scanStatus}`}
                             </button>
-
-                            <div className="h-4 w-px bg-gray-800 mx-2" />
-
-                            {/* Zoom */}
-                            <button
-                                onClick={() => setScale(prev => Math.max(0.6, prev - 0.15))}
-                                className="p-1.5 hover:bg-gray-800 rounded text-gray-400 hover:text-white cursor-pointer"
-                            >
-                                <ZoomOut size={16} />
-                            </button>
-                            <span className="text-xs text-gray-400 px-1 font-mono">{Math.round(scale * 100)}%</span>
-                            <button
-                                onClick={() => setScale(prev => Math.min(3, prev + 0.15))}
-                                className="p-1.5 hover:bg-gray-800 rounded text-gray-400 hover:text-white cursor-pointer"
-                            >
-                                <ZoomIn size={16} />
-                            </button>
                         </div>
+
+                        {/* Right Section: Primary Mode Toolbar */}
+                        <div className="flex items-center gap-2">
 
                         {/* Primary Mode Toolbar */}
                         <div className="flex items-center gap-1.5 bg-gray-950/60 p-1 rounded-xl border border-gray-800 shadow-inner relative">
@@ -2895,6 +2911,7 @@ export default function PartsCatalogViewer() {
                                 </select>
                             </div>
                         )}
+                    </div>
                     </div>
 
                     {/* Viewport container */}
