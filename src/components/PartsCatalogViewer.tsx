@@ -3552,18 +3552,18 @@ export default function PartsCatalogViewer() {
                                 </div>
                             </div>
 
-                            {/* Part rows with compact, thin rows and focus highlighting */}
-                            <div className="max-h-48 md:max-h-56 overflow-auto custom-scrollbar p-2">
+                            {/* Part rows with balanced medium row height and focus highlighting */}
+                            <div className="max-h-52 md:max-h-60 overflow-auto custom-scrollbar p-2.5">
                                 {stagedItems.length === 0 ? (
-                                    <div className="rounded-xl border border-dashed border-gray-800 p-3 text-center text-xs text-gray-400">No index parts parsed on this page.</div>
+                                    <div className="rounded-xl border border-dashed border-gray-800 p-3.5 text-center text-xs text-gray-400">No index parts parsed on this page.</div>
                                 ) : (
-                                    <table className="w-full text-[11px]" style={{ borderCollapse: 'separate', borderSpacing: '0 2px' }}>
+                                    <table className="w-full text-xs" style={{ borderCollapse: 'separate', borderSpacing: '0 3px' }}>
                                         <thead>
-                                            <tr className="text-gray-400 text-[10px] uppercase font-mono">
-                                                <th className="w-7 pb-1 text-center">Select</th>
-                                                <th className="text-left pb-1 font-bold pl-1.5">Part #</th>
-                                                <th className="text-left pb-1 font-bold pl-2">Description / Nomenclature</th>
-                                                <th className="text-right pb-1 font-bold pr-1.5 w-14">Qty</th>
+                                            <tr className="text-gray-400 text-[10.5px] uppercase font-mono">
+                                                <th className="w-8 pb-1 text-center">Select</th>
+                                                <th className="text-left pb-1 font-bold pl-2">Part #</th>
+                                                <th className="text-left pb-1 font-bold pl-2.5">Description / Nomenclature</th>
+                                                <th className="text-right pb-1 font-bold pr-2 w-16">Qty</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -3573,29 +3573,29 @@ export default function PartsCatalogViewer() {
                                                     <tr
                                                         key={item.id}
                                                         onClick={() => setFocusedSubpartIdx(idx)}
-                                                        className={`rounded-md transition-all cursor-default select-none ${
+                                                        className={`rounded-lg transition-all cursor-default select-none ${
                                                             isFocused
-                                                                ? 'bg-minion-500/25 ring-1.5 ring-minion-500 font-bold opacity-100 shadow-sm'
+                                                                ? 'bg-minion-500/25 ring-2 ring-minion-500 font-bold opacity-100 shadow-sm'
                                                                 : item.selected
                                                                 ? 'bg-gray-850/60 opacity-100'
                                                                 : 'bg-gray-950/40 opacity-40 hover:opacity-75'
                                                         }`}
                                                     >
-                                                        <td className="px-1.5 py-0.5 text-center align-middle">
+                                                        <td className="px-2 py-1 text-center align-middle">
                                                             <input 
                                                                 type="checkbox" 
                                                                 checked={item.selected} 
                                                                 onChange={e => toggleStagedItemSelection(item.id, item.partNumber, e.target.checked)} 
-                                                                className="h-3.5 w-3.5 accent-minion-500 cursor-pointer rounded transition-transform hover:scale-110" 
+                                                                className="h-4 w-4 accent-minion-500 cursor-pointer rounded transition-transform hover:scale-110" 
                                                             />
                                                         </td>
-                                                        <td className="font-mono font-bold text-gray-100 pr-1.5 pl-1.5 whitespace-nowrap align-middle text-[11px]">
+                                                        <td className="font-mono font-bold text-gray-100 pr-2 pl-2 whitespace-nowrap align-middle text-xs">
                                                             {isFocused && <span className="text-minion-400 font-black mr-1 text-xs font-mono inline-block">›</span>}
                                                             {item.partNumber}
                                                         </td>
-                                                        <td className="text-gray-200 pl-2 truncate max-w-0 w-full font-medium align-middle text-[11px]" title={item.nomenclature}>{item.nomenclature}</td>
-                                                        <td className="pr-1.5 py-0.5 align-middle text-right">
-                                                            <input value={String(item.qty)} onChange={e => updateStagedQty(item.id, e.target.value)} className="w-11 rounded border border-gray-700 bg-gray-950 px-1 py-0.5 text-center font-mono text-[11px] font-bold text-minion-300 outline-none focus:border-minion-500" />
+                                                        <td className="text-gray-200 pl-2.5 truncate max-w-0 w-full font-medium align-middle text-xs" title={item.nomenclature}>{item.nomenclature}</td>
+                                                        <td className="pr-2 py-1 align-middle text-right">
+                                                            <input value={String(item.qty)} onChange={e => updateStagedQty(item.id, e.target.value)} className="w-13 rounded-md border border-gray-700 bg-gray-950 px-1.5 py-0.5 text-center font-mono text-xs font-bold text-minion-300 outline-none focus:border-minion-500" />
                                                         </td>
                                                     </tr>
                                                 )
