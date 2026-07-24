@@ -3481,7 +3481,7 @@ export default function PartsCatalogViewer() {
                                                             />
                                                         </td>
                                                         <td className="font-mono font-bold text-gray-100 pr-2 pl-2 whitespace-nowrap align-middle">
-                                                            {isFocused && <span className="text-minion-400 mr-1 text-xs animate-pulse">👉</span>}
+                                                            {isFocused && <span className="text-minion-400 font-black mr-1.5 text-sm font-mono inline-block">›</span>}
                                                             {item.partNumber}
                                                         </td>
                                                         <td className="text-gray-200 pl-3 truncate max-w-0 w-full font-medium align-middle" title={item.nomenclature}>{item.nomenclature}</td>
