@@ -1079,8 +1079,9 @@ alter publication supabase_realtime add table minion_annotations;
 
             {/* Printable Pick Ticket Modal */}
             {printTicketReq && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in select-none">
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden">
+                <div className="printable-ticket-wrapper fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in select-none">
+                    {/* Modal container - hidden during print */}
+                    <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden no-print">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between pb-4 border-b border-gray-800 shrink-0">
                             <div className="flex items-center gap-2">
@@ -1107,9 +1108,39 @@ alter publication supabase_realtime add table minion_annotations;
                         <div className="flex-1 overflow-auto p-6 bg-white text-black rounded-xl my-4 font-sans select-text shadow-inner custom-scrollbar printable-ticket-content">
                             <style>{`
                                 @media print {
-                                    body * { visibility: hidden !important; }
-                                    .printable-ticket-content, .printable-ticket-content * { visibility: visible !important; }
-                                    .printable-ticket-content { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; color: black; background: white; }
+                                    body * {
+                                        visibility: hidden !important;
+                                    }
+                                    .printable-ticket-wrapper {
+                                        position: absolute !important;
+                                        left: 0 !important;
+                                        top: 0 !important;
+                                        width: 100% !important;
+                                        height: auto !important;
+                                        background: white !important;
+                                        visibility: visible !important;
+                                        padding: 0 !important;
+                                        margin: 0 !important;
+                                    }
+                                    .printable-ticket-wrapper .no-print {
+                                        display: none !important;
+                                    }
+                                    .printable-ticket-content, .printable-ticket-content * {
+                                        visibility: visible !important;
+                                        color: black !important;
+                                    }
+                                    .printable-ticket-content {
+                                        position: absolute !important;
+                                        left: 0 !important;
+                                        top: 0 !important;
+                                        width: 100% !important;
+                                        height: auto !important;
+                                        overflow: visible !important;
+                                        padding: 24px !important;
+                                        box-shadow: none !important;
+                                        border: none !important;
+                                        background: white !important;
+                                    }
                                 }
                             `}</style>
 
