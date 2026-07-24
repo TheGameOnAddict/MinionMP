@@ -3464,9 +3464,9 @@ export default function PartsCatalogViewer() {
                                                     <tr
                                                         key={item.id}
                                                         onClick={() => setFocusedSubpartIdx(idx)}
-                                                        className={`rounded-lg transition-all cursor-pointer ${
+                                                        className={`rounded-lg transition-all cursor-default select-none ${
                                                             isFocused
-                                                                ? 'bg-amber-500/25 ring-2 ring-amber-400 font-bold opacity-100 shadow-md'
+                                                                ? 'bg-minion-500/25 ring-2 ring-minion-500 font-bold opacity-100 shadow-md'
                                                                 : item.selected
                                                                 ? 'bg-gray-850/60 opacity-100'
                                                                 : 'bg-gray-950/40 opacity-40 hover:opacity-75'
@@ -3481,7 +3481,7 @@ export default function PartsCatalogViewer() {
                                                             />
                                                         </td>
                                                         <td className="font-mono font-bold text-gray-100 pr-2 pl-2 whitespace-nowrap align-middle">
-                                                            {isFocused && <span className="text-amber-400 mr-1 text-xs animate-pulse">👉</span>}
+                                                            {isFocused && <span className="text-minion-400 mr-1 text-xs animate-pulse">👉</span>}
                                                             {item.partNumber}
                                                         </td>
                                                         <td className="text-gray-200 pl-3 truncate max-w-0 w-full font-medium align-middle" title={item.nomenclature}>{item.nomenclature}</td>
