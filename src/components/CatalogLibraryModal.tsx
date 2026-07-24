@@ -91,16 +91,17 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
 
     return (
         <div
-            draggable={true}
+            draggable={isAdmin}
             onDragStart={(e) => {
+                if (!isAdmin) return
                 e.dataTransfer.setData('text/plain', catalog.id)
                 e.dataTransfer.effectAllowed = 'move'
             }}
             onClick={onSelect}
-            className={`group relative bg-gray-850/80 hover:bg-gray-800 border-2 rounded-2xl p-4 flex flex-col items-center transition-all duration-300 hover:scale-[1.02] shadow-xl hover:shadow-2xl hover:shadow-minion-500/10 cursor-grab active:cursor-grabbing overflow-hidden ${
+            className={`group relative bg-gray-850/80 hover:bg-gray-800 border-2 rounded-2xl p-4 flex flex-col items-center transition-all duration-300 hover:scale-[1.02] shadow-xl hover:shadow-2xl hover:shadow-minion-500/10 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} overflow-hidden ${
                 isActive ? 'border-minion-500 ring-2 ring-minion-500/30' : 'border-gray-800 hover:border-gray-700'
             }`}
-            title="Click to open or Drag card onto a Folder tab above to move!"
+            title={isAdmin ? "Click to open or Drag card onto a Folder tab above to move!" : "Click to open catalog"}
         >
             {/* Hidden Input for Updating Catalog File */}
             <input
@@ -186,28 +187,30 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
                     </span>
                 </div>
 
-                {/* Move to Folder Selector (Admin & User) */}
-                <div className="w-full mt-2 pt-2 border-t border-gray-800 flex items-center justify-between gap-1 text-[11px]" onClick={e => e.stopPropagation()}>
-                    <span className="text-gray-400 font-bold text-[10px] flex items-center gap-1 shrink-0">
-                        <Folder size={11} className="text-amber-400" /> Move to:
-                    </span>
-                    <select
-                        value={catalog.folder_id || 'folder_general'}
-                        onChange={(e) => {
-                            const selectedF = folders.find(f => f.id === e.target.value)
-                            if (selectedF) {
-                                onMoveToFolder(selectedF.id, selectedF.name)
-                            }
-                        }}
-                        className="bg-gray-900 border border-gray-700 hover:border-amber-400 text-gray-200 text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer font-mono shrink-0 max-w-[150px] truncate"
-                    >
-                        {folders.map(f => (
-                            <option key={f.id} value={f.id}>
-                                {f.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                {/* Move to Folder Selector (ADMIN ONLY) */}
+                {isAdmin && (
+                    <div className="w-full mt-2 pt-2 border-t border-gray-800 flex items-center justify-between gap-1 text-[11px]" onClick={e => e.stopPropagation()}>
+                        <span className="text-gray-400 font-bold text-[10px] flex items-center gap-1 shrink-0">
+                            <Folder size={11} className="text-amber-400" /> Move to:
+                        </span>
+                        <select
+                            value={catalog.folder_id || 'folder_general'}
+                            onChange={(e) => {
+                                const selectedF = folders.find(f => f.id === e.target.value)
+                                if (selectedF) {
+                                    onMoveToFolder(selectedF.id, selectedF.name)
+                                }
+                            }}
+                            className="bg-gray-900 border border-gray-700 hover:border-amber-400 text-gray-200 text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer font-mono shrink-0 max-w-[150px] truncate"
+                        >
+                            {folders.map(f => (
+                                <option key={f.id} value={f.id}>
+                                    {f.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
         </div>
     )

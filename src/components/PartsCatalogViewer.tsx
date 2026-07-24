@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 
 import {
-    ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-    Square, Circle, Edit3, Type, Grid, Trash2,
+    ChevronLeft, ChevronRight, ChevronUp, ZoomIn, ZoomOut,
+    Square, Circle, Edit3, Type, Grid, Trash2, MousePointer,
     RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Printer, ChevronDown, FileText
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
@@ -865,6 +865,7 @@ export default function PartsCatalogViewer() {
     const [indexItems, setIndexItems] = useState<IndexItem[]>([])
     const [indexBlocks, setIndexBlocks] = useState<ParsedIndexBlock[]>([])
     const [activeIndex, setActiveIndex] = useState(0)
+    const [focusedSubpartIdx, setFocusedSubpartIdx] = useState<number>(0)
     const [stagedItems, setStagedItems] = useState<StagedParsedItem[]>([])
     const [pageRef, setPageRef] = useState<string>('')
     const [currentPageFigure, setCurrentPageFigure] = useState<string>('')
@@ -1098,6 +1099,61 @@ export default function PartsCatalogViewer() {
     useEffect(() => {
         localStorage.setItem('minion_current_page_number', String(pageNumber))
     }, [pageNumber])
+
+    // --- INDEX MODE KEYBOARD NAVIGATION (Arrows, Shift+Arrows, Space, Escape) ---
+    useEffect(() => {
+        if (tool !== 'index') return
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const activeEl = document.activeElement
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+                return
+            }
+
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                setTool('select')
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                if (e.shiftKey) {
+                    // Shift + ArrowDown: Navigate down subpart rows in current index
+                    setFocusedSubpartIdx(prev => Math.min(stagedItems.length - 1, prev + 1))
+                } else {
+                    // ArrowDown: Move to next index block
+                    setFocusedSubpartIdx(0)
+                    selectIndexBlock(activeIndex + 1)
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                if (e.shiftKey) {
+                    // Shift + ArrowUp: Navigate up subpart rows in current index
+                    setFocusedSubpartIdx(prev => Math.max(0, prev - 1))
+                } else {
+                    // ArrowUp: Move to previous index block
+                    setFocusedSubpartIdx(0)
+                    selectIndexBlock(activeIndex - 1)
+                }
+            } else if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault()
+                if (e.shiftKey || (focusedSubpartIdx >= 0 && focusedSubpartIdx < stagedItems.length)) {
+                    // Shift + Space (or Space when focused on subpart row): Toggle checkbox
+                    const target = stagedItems[focusedSubpartIdx]
+                    if (target) {
+                        toggleStagedItemSelection(target.id, target.partNumber, !target.selected)
+                    }
+                } else {
+                    // Space: Pin / Unpin active figure index block
+                    const currentLabel = indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label
+                    if (currentLabel) {
+                        togglePinIndex(currentLabel)
+                    }
+                }
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [tool, activeIndex, indexBlocks, indexItems, stagedItems, focusedSubpartIdx, pageNumber])
 
     // --- PDF.js LOADING & RENDERING ---
     useEffect(() => {
@@ -2716,91 +2772,93 @@ export default function PartsCatalogViewer() {
                             </button>
                         </div>
 
-                        {/* Drawing Tools */}
-                        <div className="flex items-center gap-1 bg-gray-950/40 p-0.5 rounded-lg border border-gray-800">
+                        {/* Compact Drawing Tools Bar */}
+                        <div className="flex items-center gap-1 bg-gray-950/60 p-1 rounded-xl border border-gray-800 shadow-inner">
                             <button
                                 onClick={() => setTool('select')}
-                                className={`px-2 py-1 text-xs rounded font-medium cursor-pointer transition-colors ${tool === 'select' ? 'bg-minion-500 text-black font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Pointer (Select/Read)"
+                                className={`px-2.5 py-1 text-xs rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-1 ${tool === 'select' ? 'bg-minion-500 text-black font-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                                title="Select / Pointer Mode"
                             >
-                                Pointer
+                                <MousePointer size={13} /> Select
                             </button>
                             <button
                                 onClick={() => setTool('rect')}
-                                className={`p-1.5 rounded cursor-pointer transition-colors ${tool === 'rect' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Rectangle Tool"
+                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'rect' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                                title="Rectangle Box Tool"
                             >
                                 <Square size={14} />
                             </button>
                             <button
                                 onClick={() => setTool('circle')}
-                                className={`p-1.5 rounded cursor-pointer transition-colors ${tool === 'circle' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'circle' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                                 title="Circle Tool"
                             >
                                 <Circle size={14} />
                             </button>
                             <button
                                 onClick={() => setTool('pen')}
-                                className={`p-1.5 rounded cursor-pointer transition-colors ${tool === 'pen' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Pen Tool (Freehand)"
+                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'pen' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                                title="Pen Tool (Freehand Draw)"
                             >
                                 <Edit3 size={14} />
                             </button>
                             <button
                                 onClick={() => setTool('text')}
-                                className={`p-1.5 rounded cursor-pointer transition-colors ${tool === 'text' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Sticky Note"
+                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'text' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                                title="Sticky Note Tool"
                             >
                                 <Type size={14} />
                             </button>
                             <button
                                 onClick={() => setTool('part_box')}
-                                className={`px-2 py-1 text-xs rounded font-medium cursor-pointer transition-colors ${tool === 'part_box' ? 'bg-minion-500 text-black font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                                className={`px-2 py-1 text-xs rounded-lg font-bold cursor-pointer transition-colors ${tool === 'part_box' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                                 title="Define Requested Part Bounding Box"
                             >
                                 + Part Box
                             </button>
                             <button
                                 onClick={() => { setTool('index'); selectIndexBlock(0) }}
-                                className={`px-2 py-1 text-xs rounded font-medium cursor-pointer transition-colors ${tool === 'index' ? 'bg-cyan-400 text-black font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Index wheel selector"
+                                className={`px-2.5 py-1 text-xs rounded-lg font-black cursor-pointer transition-colors ${tool === 'index' ? 'bg-amber-400 text-black shadow-md ring-2 ring-amber-400/40' : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-gray-700'}`}
+                                title="Index Mode & Highlight Navigation"
                             >
-                                <span className="inline-flex items-center gap-1"><ListTree size={13} /> Index</span>
+                                <span className="inline-flex items-center gap-1.5"><ListTree size={14} /> Index Mode</span>
                             </button>
                             <button
                                 onClick={() => setTool('eraser')}
-                                className={`p-1.5 rounded cursor-pointer transition-colors ${tool === 'eraser' ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-850 hover:text-red-400'}`}
+                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'eraser' ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-850 hover:text-red-400'}`}
                                 title="Eraser (Delete shapes/notes)"
                             >
                                 <Trash2 size={14} />
                             </button>
                         </div>
 
-                        {/* Styles */}
-                        <div className="flex items-center gap-3 flex-1 justify-end">
-                            {/* Color Selector */}
-                            <div className="flex items-center gap-1.5">
-                                {['#ffcc00', '#ff3b30', '#007aff', '#34c759', '#af52de'].map(c => (
-                                    <button
-                                        key={c}
-                                        onClick={() => setColor(c)}
-                                        className={`w-4 h-4 rounded-full border border-gray-600 transition-transform ${color === c ? 'scale-125 border-white ring-1 ring-minion-500' : 'hover:scale-110'}`}
-                                        style={{ backgroundColor: c }}
-                                    />
-                                ))}
+                        {/* Styles — Color & Thickness (ONLY VISIBLE WHEN A DRAWING TOOL IS ACTIVE) */}
+                        {['pen', 'rect', 'circle', 'text', 'part_box'].includes(tool) && (
+                            <div className="flex items-center gap-3 flex-1 justify-end animate-fade-in">
+                                {/* Color Selector */}
+                                <div className="flex items-center gap-1.5 bg-gray-950/60 p-1 rounded-lg border border-gray-800">
+                                    {['#ffcc00', '#ff3b30', '#007aff', '#34c759', '#af52de'].map(c => (
+                                        <button
+                                            key={c}
+                                            onClick={() => setColor(c)}
+                                            className={`w-4 h-4 rounded-full border border-gray-600 transition-transform ${color === c ? 'scale-125 border-white ring-2 ring-minion-500' : 'hover:scale-110'}`}
+                                            style={{ backgroundColor: c }}
+                                        />
+                                    ))}
+                                </div>
+                                {/* Thickness */}
+                                <select
+                                    value={thickness}
+                                    onChange={e => setThickness(Number(e.target.value))}
+                                    className="bg-gray-800 border border-gray-700 text-xs rounded px-1.5 py-0.5 outline-none text-gray-300 font-mono"
+                                >
+                                    <option value={1}>1px</option>
+                                    <option value={3}>3px</option>
+                                    <option value={5}>5px</option>
+                                    <option value={8}>8px</option>
+                                </select>
                             </div>
-                            {/* Thickness */}
-                            <select
-                                value={thickness}
-                                onChange={e => setThickness(Number(e.target.value))}
-                                className="bg-gray-800 border border-gray-700 text-xs rounded px-1.5 py-0.5 outline-none text-gray-300"
-                            >
-                                <option value={1}>1px</option>
-                                <option value={3}>3px</option>
-                                <option value={5}>5px</option>
-                                <option value={8}>8px</option>
-                            </select>
-                        </div>
+                        )}
                     </div>
 
                     {/* Viewport container */}
@@ -3251,40 +3309,85 @@ export default function PartsCatalogViewer() {
                         <div className={`fixed left-4 bottom-4 z-30 rounded-2xl border-2 border-amber-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
                             {/* Header */}
                             <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
-                                <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-[0.16em] text-minion-400 flex items-center gap-1.5">
-                                        <ListTree size={14} /> Index &amp; Subpart Editor
+                                <div className="min-w-0 flex items-center gap-3">
+                                    <div>
+                                        <div className="text-xs font-black uppercase tracking-[0.16em] text-minion-400 flex items-center gap-1.5">
+                                            <ListTree size={14} /> Index &amp; Subpart Editor
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 mt-0.5 font-medium">Use Up/Down keys to navigate indices • Shift + Up/Down for subparts • Space to Pin/Select</div>
                                     </div>
-                                    <div className="text-[10px] text-gray-400 mt-0.5 font-medium">Toggle checkboxes to include/exclude subparts &amp; edit quantities</div>
                                 </div>
+
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <span className="rounded-lg border border-gray-700 bg-gray-850 px-2.5 py-1 text-xs font-bold text-gray-200 font-mono">
-                                        {indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label || '—'} <span className="text-gray-500">{Math.max(indexItems.length, indexBlocks.length) ? `${activeIndex + 1}/${Math.max(indexItems.length, indexBlocks.length)}` : ''}</span>
-                                    </span>
+                                    {/* Index Navigation Stepper */}
+                                    <div className="flex items-center gap-1 bg-gray-800 rounded-xl p-0.5 border border-gray-700">
+                                        <button
+                                            onClick={() => { setFocusedSubpartIdx(0); selectIndexBlock(activeIndex - 1) }}
+                                            disabled={activeIndex <= 0}
+                                            className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded-lg text-gray-200 cursor-pointer"
+                                            title="Previous Index Block (Up Arrow)"
+                                        >
+                                            <ChevronUp size={14} />
+                                        </button>
+                                        <span className="rounded-lg bg-gray-950 px-2.5 py-1 text-xs font-bold text-gray-200 font-mono">
+                                            {indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label || '—'} <span className="text-gray-500">{Math.max(indexItems.length, indexBlocks.length) ? `${activeIndex + 1}/${Math.max(indexItems.length, indexBlocks.length)}` : ''}</span>
+                                        </span>
+                                        <button
+                                            onClick={() => { setFocusedSubpartIdx(0); selectIndexBlock(activeIndex + 1) }}
+                                            disabled={activeIndex >= Math.max(indexItems.length, indexBlocks.length) - 1}
+                                            className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded-lg text-gray-200 cursor-pointer"
+                                            title="Next Index Block (Down Arrow)"
+                                        >
+                                            <ChevronDown size={14} />
+                                        </button>
+                                    </div>
+
                                     {(indexItems[activeIndex] || indexBlocks[activeIndex]) && (
                                         <button
                                             onClick={() => togglePinIndex(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label)}
-                                            className={`px-3 py-1.5 rounded-lg border font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md ${
+                                            className={`px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md ${
                                                 (pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label)
                                                     ? 'bg-amber-400 border-amber-500 text-black font-black ring-2 ring-amber-400/40'
                                                     : 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
                                             }`}
-                                            title={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "Unpin figure highlight overlay" : "Pin figure highlight overlay"}
+                                            title={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "Unpin figure highlight overlay (Space key)" : "Pin figure highlight overlay (Space key)"}
                                         >
                                             <Pin size={13} className={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "fill-black text-black" : "text-amber-400"} />
                                             <span>{(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? 'PINNED' : 'PIN FIGURE'}</span>
                                         </button>
                                     )}
+
                                     <button
                                         onClick={importStagedItemsToDraft}
                                         disabled={stagedItems.filter(i => i.selected).length === 0}
-                                        className="rounded-lg bg-minion-500 px-3.5 py-1.5 text-xs font-black text-black hover:bg-minion-400 disabled:opacity-40 transition-colors cursor-pointer shadow-md"
+                                        className="rounded-xl bg-minion-500 px-3.5 py-1.5 text-xs font-black text-black hover:bg-minion-400 disabled:opacity-40 transition-colors cursor-pointer shadow-md"
                                     >
                                         Add Selected to Draft
                                     </button>
+
+                                    {/* Prominent Exit Index Mode Button */}
+                                    <button
+                                        onClick={() => setTool('select')}
+                                        className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white border border-red-500/40 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-md"
+                                        title="Exit Index Mode (or press Esc key)"
+                                    >
+                                        <span>✕ Exit Index Mode</span>
+                                        <kbd className="hidden sm:inline-block px-1 bg-black/40 text-[9.5px] rounded font-mono">Esc</kbd>
+                                    </button>
                                 </div>
                             </div>
-                            {/* Part rows with large touch-friendly checkboxes */}
+
+                            {/* Keyboard Shortcuts Hint Bar */}
+                            <div className="bg-gray-950 px-4 py-1.5 border-b border-gray-800 flex items-center justify-between text-[11px] font-mono text-gray-400">
+                                <div className="flex items-center gap-3 overflow-x-auto">
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">↑ / ↓</kbd> Move Index</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Shift + ↑ / ↓</kbd> Move Lines</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Space</kbd> Pin / Check Item</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-red-300 px-1.5 py-0.5 rounded border border-gray-700">Esc</kbd> Exit</span>
+                                </div>
+                            </div>
+
+                            {/* Part rows with large touch-friendly checkboxes and focus highlighting */}
                             <div className="max-h-56 md:max-h-64 overflow-auto custom-scrollbar p-3">
                                 {stagedItems.length === 0 ? (
                                     <div className="rounded-xl border border-dashed border-gray-800 p-4 text-center text-xs text-gray-400">No index parts parsed on this page.</div>
@@ -3299,23 +3402,39 @@ export default function PartsCatalogViewer() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {stagedItems.map(item => (
-                                                <tr key={item.id} className={`rounded-lg transition-colors ${item.selected ? 'bg-gray-850/60 opacity-100' : 'bg-gray-950/40 opacity-40 hover:opacity-75'}`}>
-                                                    <td className="p-2 text-center align-middle">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={item.selected} 
-                                                            onChange={e => toggleStagedItemSelection(item.id, item.partNumber, e.target.checked)} 
-                                                            className="h-5 w-5 accent-minion-500 cursor-pointer rounded transition-transform hover:scale-110" 
-                                                        />
-                                                    </td>
-                                                    <td className="font-mono font-bold text-gray-100 pr-2 pl-2 whitespace-nowrap align-middle">{item.partNumber}</td>
-                                                    <td className="text-gray-200 pl-3 truncate max-w-0 w-full font-medium align-middle" title={item.nomenclature}>{item.nomenclature}</td>
-                                                    <td className="pr-2 align-middle text-right">
-                                                        <input value={String(item.qty)} onChange={e => updateStagedQty(item.id, e.target.value)} className="w-14 rounded-lg border border-gray-700 bg-gray-950 px-2 py-1 text-center font-mono text-xs font-bold text-minion-300 outline-none focus:border-minion-500" />
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {stagedItems.map((item, idx) => {
+                                                const isFocused = idx === focusedSubpartIdx
+                                                return (
+                                                    <tr
+                                                        key={item.id}
+                                                        onClick={() => setFocusedSubpartIdx(idx)}
+                                                        className={`rounded-lg transition-all cursor-pointer ${
+                                                            isFocused
+                                                                ? 'bg-amber-500/25 ring-2 ring-amber-400 font-bold opacity-100 shadow-md'
+                                                                : item.selected
+                                                                ? 'bg-gray-850/60 opacity-100'
+                                                                : 'bg-gray-950/40 opacity-40 hover:opacity-75'
+                                                        }`}
+                                                    >
+                                                        <td className="p-2 text-center align-middle">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={item.selected} 
+                                                                onChange={e => toggleStagedItemSelection(item.id, item.partNumber, e.target.checked)} 
+                                                                className="h-5 w-5 accent-minion-500 cursor-pointer rounded transition-transform hover:scale-110" 
+                                                            />
+                                                        </td>
+                                                        <td className="font-mono font-bold text-gray-100 pr-2 pl-2 whitespace-nowrap align-middle">
+                                                            {isFocused && <span className="text-amber-400 mr-1 text-xs animate-pulse">👉</span>}
+                                                            {item.partNumber}
+                                                        </td>
+                                                        <td className="text-gray-200 pl-3 truncate max-w-0 w-full font-medium align-middle" title={item.nomenclature}>{item.nomenclature}</td>
+                                                        <td className="pr-2 align-middle text-right">
+                                                            <input value={String(item.qty)} onChange={e => updateStagedQty(item.id, e.target.value)} className="w-14 rounded-lg border border-gray-700 bg-gray-950 px-2 py-1 text-center font-mono text-xs font-bold text-minion-300 outline-none focus:border-minion-500" />
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
                                         </tbody>
                                     </table>
                                 )}
