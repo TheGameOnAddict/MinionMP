@@ -606,6 +606,10 @@ export default function PartsCatalogViewer() {
     const [showLibraryModal, setShowLibraryModal] = useState(false)
     const [activeCatalogFolder, setActiveCatalogFolder] = useState<string>('PA-28 WARRIOR')
 
+    // Index Editor Panel Docking Position & Minimize State
+    const [indexEditorPosition, setIndexEditorPosition] = useState<'bottom' | 'top'>('bottom')
+    const [isIndexEditorMinimized, setIsIndexEditorMinimized] = useState<boolean>(false)
+
     // Multi-Page Print & Options State
     const [showPrintModal, setShowPrintModal] = useState(false)
     const [printMode, setPrintMode] = useState<'current' | 'range' | 'all'>('current')
@@ -2014,6 +2018,10 @@ export default function PartsCatalogViewer() {
         }
 
         setActiveIndex(bounded)
+        // Smart Auto-Docking: if index is in the lower half of page list, dock panel to top to prevent obscuring view
+        if (count > 1) {
+            setIndexEditorPosition(bounded / count >= 0.5 ? 'top' : 'bottom')
+        }
         if (source.length > bounded) {
             const block = source[bounded]
             const pageSelections = indexSelections[pageNumber]?.[block.label] || {}
@@ -3358,20 +3366,73 @@ export default function PartsCatalogViewer() {
                     )}
                 </div>
                     {tool === 'index' && (
-                        <div className={`fixed left-4 bottom-4 z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
-                            {/* Header */}
-                            <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
-                                <div className="min-w-0 flex items-center gap-3">
-                                    <div>
-                                        <div className="text-xs font-black uppercase tracking-[0.16em] text-minion-400 flex items-center gap-1.5">
-                                            <ListTree size={14} /> Index &amp; Subpart Editor
-                                        </div>
-                                        <div className="text-[10px] text-gray-400 mt-0.5 font-medium">Use Up/Down keys to navigate indices • Shift + Up/Down for subparts • Space to Pin/Select</div>
-                                    </div>
+                        isIndexEditorMinimized ? (
+                            <div className={`fixed left-4 ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in transition-all duration-300 backdrop-blur-md select-none ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
+                                <div className="flex items-center gap-3 text-xs font-bold text-gray-200 font-mono">
+                                    <span className="text-minion-400 font-black flex items-center gap-1.5">
+                                        <ListTree size={14} /> Index {activeIndex + 1}/{Math.max(indexItems.length, indexBlocks.length)}:
+                                    </span>
+                                    <span className="text-white font-black">{indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label || '—'}</span>
+                                    <span className="text-gray-400 font-normal">({stagedItems.filter(i => i.selected).length} selected)</span>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0">
-                                    {/* Index Navigation Stepper */}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIndexEditorPosition(prev => prev === 'bottom' ? 'top' : 'bottom')}
+                                        className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors cursor-pointer flex items-center gap-1"
+                                        title={indexEditorPosition === 'bottom' ? "Dock panel at top of screen to see lower page contents" : "Dock panel at bottom of screen"}
+                                    >
+                                        <span>{indexEditorPosition === 'bottom' ? '⬆ Dock Top' : '⬇ Dock Bottom'}</span>
+                                    </button>
+                                    <button
+                                        onClick={importStagedItemsToDraft}
+                                        disabled={stagedItems.filter(i => i.selected).length === 0}
+                                        className="rounded-lg bg-minion-500 px-3 py-1 text-xs font-black text-black hover:bg-minion-400 disabled:opacity-40 transition-colors cursor-pointer shadow-md"
+                                    >
+                                        Add to Cart
+                                    </button>
+                                    <button
+                                        onClick={() => setIsIndexEditorMinimized(false)}
+                                        className="px-2.5 py-1 bg-minion-500/20 hover:bg-minion-500/30 text-minion-400 border border-minion-500/40 text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1"
+                                        title="Expand Index & Subpart Editor"
+                                    >
+                                        <span>▲ Expand Panel</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className={`fixed left-4 ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
+                                {/* Header */}
+                                <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
+                                    <div className="min-w-0 flex items-center gap-3">
+                                        <div>
+                                            <div className="text-xs font-black uppercase tracking-[0.16em] text-minion-400 flex items-center gap-1.5">
+                                                <ListTree size={14} /> Index &amp; Subpart Editor
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 mt-0.5 font-medium">Use Up/Down keys to navigate indices • Shift + Up/Down for subparts • Space to Pin/Select</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {/* Dock Position Toggle Button */}
+                                        <button
+                                            onClick={() => setIndexEditorPosition(prev => prev === 'bottom' ? 'top' : 'bottom')}
+                                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                                            title={indexEditorPosition === 'bottom' ? "Dock panel at top of screen to see lower page contents" : "Dock panel at bottom of screen"}
+                                        >
+                                            <span>{indexEditorPosition === 'bottom' ? '⬆ Dock Top' : '⬇ Dock Bottom'}</span>
+                                        </button>
+
+                                        {/* Minimize Toggle Button */}
+                                        <button
+                                            onClick={() => setIsIndexEditorMinimized(true)}
+                                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                                            title="Minimize panel to unblock page view"
+                                        >
+                                            <span>▼ Minimize</span>
+                                        </button>
+
+                                        {/* Index Navigation Stepper */}
                                     <div className="flex items-center gap-1 bg-gray-800 rounded-xl p-0.5 border border-gray-700">
                                         <button
                                             onClick={() => { setFocusedSubpartIdx(0); selectIndexBlock(activeIndex - 1) }}
@@ -3496,7 +3557,8 @@ export default function PartsCatalogViewer() {
                                 )}
                             </div>
                         </div>
-                    )}
+                    )
+                )}
 
 
             </div>
