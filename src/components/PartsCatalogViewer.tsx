@@ -1543,8 +1543,13 @@ export default function PartsCatalogViewer() {
                 const page = meta[`fig-${value.toLowerCase()}`]
                 if (page) targetPage = page
             } else if (type === 'pg') {
-                const page = meta[`pg-${value.toUpperCase()}`]
-                if (page) targetPage = page
+                const rawNum = parseInt(value, 10)
+                if (!isNaN(rawNum) && rawNum > 0) {
+                    targetPage = rawNum
+                } else {
+                    const page = meta[`pg-${value.toUpperCase()}`]
+                    if (page) targetPage = page
+                }
             } else if (type === 'idx') {
                 pendingJumpTargetRef.current = { indexStr: value || group, partNumber }
 
@@ -1579,7 +1584,10 @@ export default function PartsCatalogViewer() {
             }
 
             if (targetPage > 0 && targetPage <= totalPages) {
-                setTool('index')
+                // Only start Index Mode when clicking index or figure chips, NOT page number chips
+                if (type === 'idx' || type === 'fig') {
+                    setTool('index')
+                }
                 if (targetPage === curPage) {
                     if (type === 'idx') {
                         const cleanTarget = cleanIndexLabel(value || group)
