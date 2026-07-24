@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import {
     ChevronLeft, ChevronRight, ChevronUp, ZoomIn, ZoomOut,
     Square, Circle, Edit3, Type, Grid, Trash2, MousePointer,
-    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Printer, ChevronDown
+    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Printer, ChevronDown,
+    ArrowUp, ArrowDown, Minimize2, Maximize2
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
@@ -3367,7 +3368,7 @@ export default function PartsCatalogViewer() {
                 </div>
                     {tool === 'index' && (
                         isIndexEditorMinimized ? (
-                            <div className={`fixed left-4 ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in transition-all duration-300 backdrop-blur-md select-none ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
+                            <div className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in transition-all duration-300 ease-in-out backdrop-blur-md select-none`}>
                                 <div className="flex items-center gap-3 text-xs font-bold text-gray-200 font-mono">
                                     <span className="text-minion-400 font-black flex items-center gap-1.5">
                                         <ListTree size={14} /> Index {activeIndex + 1}/{Math.max(indexItems.length, indexBlocks.length)}:
@@ -3379,10 +3380,11 @@ export default function PartsCatalogViewer() {
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => setIndexEditorPosition(prev => prev === 'bottom' ? 'top' : 'bottom')}
-                                        className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors cursor-pointer flex items-center gap-1"
+                                        className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                                         title={indexEditorPosition === 'bottom' ? "Dock panel at top of screen to see lower page contents" : "Dock panel at bottom of screen"}
                                     >
-                                        <span>{indexEditorPosition === 'bottom' ? '⬆ Dock Top' : '⬇ Dock Bottom'}</span>
+                                        {indexEditorPosition === 'bottom' ? <ArrowUp size={12} className="text-minion-400" /> : <ArrowDown size={12} className="text-minion-400" />}
+                                        <span>{indexEditorPosition === 'bottom' ? 'Dock Top' : 'Dock Bottom'}</span>
                                     </button>
                                     <button
                                         onClick={importStagedItemsToDraft}
@@ -3393,15 +3395,16 @@ export default function PartsCatalogViewer() {
                                     </button>
                                     <button
                                         onClick={() => setIsIndexEditorMinimized(false)}
-                                        className="px-2.5 py-1 bg-minion-500/20 hover:bg-minion-500/30 text-minion-400 border border-minion-500/40 text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1"
+                                        className="px-2.5 py-1 bg-minion-500/20 hover:bg-minion-500/30 text-minion-400 border border-minion-500/40 text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center gap-1.5"
                                         title="Expand Index & Subpart Editor"
                                     >
-                                        <span>▲ Expand Panel</span>
+                                        <Maximize2 size={12} />
+                                        <span>Expand Panel</span>
                                     </button>
                                 </div>
                             </div>
                         ) : (
-                            <div className={`fixed left-4 ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
+                            <div className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ease-in-out`}>
                                 {/* Header */}
                                 <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
                                     <div className="min-w-0 flex items-center gap-3">
@@ -3417,19 +3420,20 @@ export default function PartsCatalogViewer() {
                                         {/* Dock Position Toggle Button */}
                                         <button
                                             onClick={() => setIndexEditorPosition(prev => prev === 'bottom' ? 'top' : 'bottom')}
-                                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                                            className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                                             title={indexEditorPosition === 'bottom' ? "Dock panel at top of screen to see lower page contents" : "Dock panel at bottom of screen"}
                                         >
-                                            <span>{indexEditorPosition === 'bottom' ? '⬆ Dock Top' : '⬇ Dock Bottom'}</span>
+                                            {indexEditorPosition === 'bottom' ? <ArrowUp size={12} className="text-minion-400" /> : <ArrowDown size={12} className="text-minion-400" />}
+                                            <span>{indexEditorPosition === 'bottom' ? 'Dock Top' : 'Dock Bottom'}</span>
                                         </button>
 
                                         {/* Minimize Toggle Button */}
                                         <button
                                             onClick={() => setIsIndexEditorMinimized(true)}
-                                            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                                            className="p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center shadow-sm"
                                             title="Minimize panel to unblock page view"
                                         >
-                                            <span>▼ Minimize</span>
+                                            <Minimize2 size={13} className="text-gray-400" />
                                         </button>
 
                                         {/* Index Navigation Stepper */}
