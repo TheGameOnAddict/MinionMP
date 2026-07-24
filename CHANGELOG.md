@@ -4,16 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
-
-### Changed
-- **MechanicForm close button now requires admin password** — The X button no longer relies on holding Ctrl to force-close the window. Clicking it opens a password modal; the window closes only after the correct admin password is entered. Incorrect attempts show an inline error and clear the input.
+## [0.0.8] — 2026-07-23
 
 ### Added
-- **Mechanic UI state capture in Feedback** — Bug reports and suggestions now capture a snapshot of the Mechanic UI's form state (including inputs, pasted IPC text, and parsed part lines).
-- **Load State button** — The Reports Viewer in the Parts Dashboard now features a "Load UI State" button (download icon) for reports that include app state, which launches the Mechanic View restored to the exact state at the time of submission.
-- `load-feedback-state` IPC handler in `electron/main.ts` — triggers the mechanic window to open and pushes a `load-state` IPC payload to restore the UI. Added to the preload script allowlist along with the `load-state` receive channel.
-- `verify-admin-password` IPC handler in `electron/main.ts` — verifies a password against the stored salted hash without requiring a new password (read-only check). Added to the preload allowlist in `electron/preload.ts`.
+- **Aircraft Catalog Folders & Carousel Library** — Aircraft catalog library with folder tabs (`PA-28 WARRIOR`, `PA-34 SENECA`, `GENERAL & ENGINES`) and folder creation in Admin mode.
+- **Smart Index & Subpart Editor Auto-Docking** — Auto-docks panel to Top or Bottom based on figure Y-location to prevent obscuring PDF drawing.
+- **GPU Docking Motion Choreography** — Smooth 60fps CSS keyframe animation sequence (slides out right and glides in from left).
+- **Sidebar-Aware Dynamic Alignment** — Editor panel dynamically shifts left/right to respect left Chapters/Search panel and right Draft Request drawer.
+- **Minimize / Expand Floating Status Bar** — Collapses editor into a slim 36px floating status bar for 100% unblocked view.
+- **Technician Handoff Safety (`Clear Info`)** — Added `Clear Info` button that purges mechanic info while automatically resetting focus to Mechanic Name input.
+
+### Changed
+- **Mouse Scroll & Keyboard Navigation** — `Shift + Mouse Scroll` cycles index blocks while standard mouse wheel scrolls the catalog page normally.
+- **Precision Chip Navigation** — `IDX` chips jump & start Index Mode; `FIG` & `PG` chips jump in Normal / Select Mode without activating Index Mode.
+- **Brand Palette & Icon Standardization** — Unified brand color token to Minion Yellow (`#F5E050` / `#FAE96F`) and standardized Lucide SVG icons across all toolbar headers and buttons.
 
 ---
 
