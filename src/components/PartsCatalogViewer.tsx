@@ -2816,7 +2816,7 @@ export default function PartsCatalogViewer() {
                                 title="Index Mode — Recommended method for picking & pinning catalog parts"
                             >
                                 <ListTree size={14} className={tool === 'index' ? 'text-black fill-black/30' : 'text-minion-400 fill-minion-400/30'} />
-                                <span>📌 Index Mode (Recommended)</span>
+                                <span>Index Mode (Recommended)</span>
                             </button>
 
                             {/* Collapsible Draw Tools Dropdown */}

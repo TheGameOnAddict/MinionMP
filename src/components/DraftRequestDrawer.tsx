@@ -437,8 +437,13 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                                 className="w-full bg-gray-900 border border-minion-500/30 rounded-lg px-3 py-1.5 text-xs text-minion-300 font-bold focus:border-minion-500 focus:ring-1 focus:ring-minion-500/40 outline-none font-mono placeholder-gray-600 transition-colors"
                                 placeholder="101"
                                 value={discrepancy}
-                                onChange={e => setDiscrepancy(e.target.value)}
+                                onChange={e => {
+                                    const val = e.target.value.slice(0, 3)
+                                    setDiscrepancy(val)
+                                }}
                                 type="number"
+                                max={999}
+                                maxLength={3}
                             />
                         </div>
                     </div>
