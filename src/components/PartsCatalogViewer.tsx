@@ -2948,7 +2948,12 @@ export default function PartsCatalogViewer() {
                     {/* Viewport container */}
                     <div
                         ref={containerRef}
-                        onWheel={tool === 'index' ? (e => { e.preventDefault(); selectIndexBlock(activeIndex + (e.deltaY > 0 ? 1 : -1)) }) : undefined}
+                        onWheel={tool === 'index' ? (e => {
+                            if (e.shiftKey) {
+                                e.preventDefault()
+                                selectIndexBlock(activeIndex + (e.deltaY > 0 ? 1 : -1))
+                            }
+                        }) : undefined}
                         className="flex-1 overflow-auto flex items-start justify-center p-4 relative custom-scrollbar bg-gray-900"
                     >
                         {pdfLoading ? (
@@ -3538,7 +3543,7 @@ export default function PartsCatalogViewer() {
                             {/* Keyboard Shortcuts Hint Bar */}
                             <div className="bg-gray-950 px-4 py-1.5 border-b border-gray-800 flex items-center justify-between text-[11px] font-mono text-gray-400">
                                 <div className="flex items-center gap-3 overflow-x-auto">
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">↑ / ↓</kbd> Move Index</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Shift + Wheel / ↑ / ↓</kbd> Move Index</span>
                                     <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Shift + ↑ / ↓</kbd> Navigate Lines</span>
                                     <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Space</kbd> Check Item</span>
                                     <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Ctrl + Space</kbd> Pin Figure</span>
