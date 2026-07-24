@@ -1600,8 +1600,8 @@ export default function PartsCatalogViewer() {
             }
 
             if (targetPage > 0 && targetPage <= totalPages) {
-                // Only start Index Mode when clicking index or figure chips, NOT page number chips
-                if (type === 'idx' || type === 'fig') {
+                // Only start Index Mode when clicking index (IDX) chips, NOT figure (FIG) or page number (PG) chips
+                if (type === 'idx') {
                     setTool('index')
                 }
                 if (targetPage === curPage) {
