@@ -3,6 +3,7 @@ import PartsCatalogViewer from './components/PartsCatalogViewer'
 import PartsDashboard from './components/PartsDashboard'
 import PartsDiscovery from './components/PartsDiscovery'
 import LaunchPad from './components/LaunchPad'
+import MobileFulfillView from './components/MobileFulfillView'
 import './App.css'
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/catalog" element={<PartsCatalogViewer />} />
         <Route path="/discovery" element={<PartsDiscovery />} />
         <Route path="/dashboard" element={<PartsDashboard />} />
+        <Route path="/fulfill" element={<MobileFulfillView />} />
         {/* Support old route just in case */}
         <Route path="/parts" element={<Navigate to="/dashboard" />} />
         <Route path="/mechanic" element={<Navigate to="/catalog" />} />

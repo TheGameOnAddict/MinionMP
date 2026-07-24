@@ -1079,6 +1079,15 @@ alter publication supabase_realtime add table minion_annotations;
 
             {/* Printable Pick Ticket Modal */}
             {printTicketReq && (() => {
+                const host = window.location.origin + window.location.pathname
+                let payloadBase64 = ''
+                try {
+                    payloadBase64 = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(printTicketReq)))))
+                } catch (e) {}
+
+                const fulfillUrl = `${host}#/fulfill?id=${printTicketReq.id}${payloadBase64 ? `&payload=${payloadBase64}` : ''}`
+                const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(fulfillUrl)}`
+
                 const handlePrintPickTicket = () => {
                     const itemsHtml = (printTicketReq.items || []).map((item: any) => `
                         <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -1106,7 +1115,7 @@ alter publication supabase_realtime add table minion_annotations;
                                 @page { size: auto; margin: 12mm; }
                                 body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #000; background: #fff; margin: 0; }
                                 * { box-sizing: border-box; }
-                                .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+                                .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
                                 .title { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; margin: 0; color: #000; }
                                 .subtitle { font-size: 11px; font-weight: 700; color: #4b5563; margin-top: 2px; }
                                 .meta-box { background: #f3f4f6; border-radius: 8px; padding: 12px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; }
@@ -1123,9 +1132,13 @@ alter publication supabase_realtime add table minion_annotations;
                                     <h1 class="title">MINION MP — PARTS PICK TICKET</h1>
                                     <div class="subtitle">AIRCRAFT PARTS REQUISITION & PICK LIST</div>
                                 </div>
-                                <div style="text-align: right;">
-                                    <div style="font-family: monospace; font-size: 16px; font-weight: bold;">#${printTicketReq.id.slice(-5)}</div>
-                                    <div style="font-size: 11px; color: #6b7280;">${new Date(printTicketReq.timestamp).toLocaleString()}</div>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <img src="${qrImgUrl}" alt="Scan to Fulfill" style="width: 76px; height: 76px; border: 1px solid #000; padding: 2px; border-radius: 4px;" />
+                                    <div style="text-align: right;">
+                                        <div style="font-family: monospace; font-size: 16px; font-weight: bold;">#${printTicketReq.id.slice(-5)}</div>
+                                        <div style="font-size: 11px; color: #6b7280;">${new Date(printTicketReq.timestamp).toLocaleString()}</div>
+                                        <div style="font-size: 9px; font-weight: bold; color: #d97706; margin-top: 3px;">📱 SCAN TO FULFILL ON PHONE</div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1197,14 +1210,18 @@ alter publication supabase_realtime add table minion_annotations;
 
                             {/* Ticket Paper Preview */}
                             <div className="flex-1 overflow-auto p-6 bg-white text-black rounded-xl my-4 font-sans select-text shadow-inner custom-scrollbar">
-                                <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-start">
+                                <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-center">
                                     <div>
                                         <h1 className="text-2xl font-black tracking-tight text-black">MINION MP — PARTS PICK TICKET</h1>
                                         <p className="text-xs font-bold text-gray-700">AIRCRAFT PARTS REQUISITION &amp; PICK LIST</p>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-lg font-mono font-bold">#{printTicketReq.id.slice(-5)}</div>
-                                        <div className="text-xs text-gray-600">{new Date(printTicketReq.timestamp).toLocaleString()}</div>
+                                    <div className="flex items-center gap-3">
+                                        <img src={qrImgUrl} alt="Scan to Fulfill" className="w-16 h-16 border border-gray-300 p-0.5 rounded shadow-sm" />
+                                        <div className="text-right">
+                                            <div className="text-lg font-mono font-bold">#{printTicketReq.id.slice(-5)}</div>
+                                            <div className="text-xs text-gray-600">{new Date(printTicketReq.timestamp).toLocaleString()}</div>
+                                            <div className="text-[9px] font-bold text-amber-600 mt-0.5">📱 SCAN TO FULFILL ON PHONE</div>
+                                        </div>
                                     </div>
                                 </div>
 
