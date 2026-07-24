@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { parseIPC, ParsedItem } from '../utils/parser'
 import { db, RequestLineItem } from '../utils/db'
+import { adminStore } from '../utils/adminStore'
 
 type SelectableParsedItem = ParsedItem & { selected: boolean }
 
@@ -62,6 +63,30 @@ function ScrollableFigureText({ text }: ScrollableFigureTextProps) {
 }
 
 export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDrawerProps) {
+    const [isAdmin, setIsAdmin] = useState(() => adminStore.getIsUnlocked())
+    const [hideClipboardParser, setHideClipboardParser] = useState(() => localStorage.getItem('minion_drawer_hide_clipboard_parser') === 'true')
+    const [hideManualEntry, setHideManualEntry] = useState(() => localStorage.getItem('minion_drawer_hide_manual_entry') === 'true')
+
+    useEffect(() => {
+        return adminStore.subscribe(() => {
+            setIsAdmin(adminStore.getIsUnlocked())
+        })
+    }, [])
+
+    const handleToggleHideClipboardParser = () => {
+        const next = !hideClipboardParser
+        setHideClipboardParser(next)
+        localStorage.setItem('minion_drawer_hide_clipboard_parser', String(next))
+        showToast(next ? 'Clipboard Parser hidden from non-admin users' : 'Clipboard Parser visible to all users')
+    }
+
+    const handleToggleHideManualEntry = () => {
+        const next = !hideManualEntry
+        setHideManualEntry(next)
+        localStorage.setItem('minion_drawer_hide_manual_entry', String(next))
+        showToast(next ? 'Manual Entry hidden from non-admin users' : 'Manual Entry visible to all users')
+    }
+
     const [draftItems, setDraftItems] = useState<Omit<RequestLineItem, 'status'>[]>(() => {
         const local = localStorage.getItem('minion_draft_items')
         return local ? JSON.parse(local) : []
@@ -494,98 +519,128 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                     )}
 
                     {/* Manual Entry Form */}
-                    <div className="pt-2 border-t border-gray-850">
-                        <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5 select-none">
-                            <input
-                                type="checkbox"
-                                checked={showManualEntry}
-                                onChange={e => setShowManualEntry(e.target.checked)}
-                                className="rounded border-gray-700 bg-gray-850 text-minion-500 focus:ring-minion-500 w-3 h-3"
-                            />
-                            <span>Manual Entry Row</span>
-                        </label>
-
-                        {showManualEntry && (
-                            <div className="bg-gray-850/35 border border-gray-800/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
-                                <input
-                                    className="min-w-0 flex-1 bg-gray-900/70 border border-gray-800 rounded px-2 py-1 text-[11px] text-gray-100 outline-none focus:border-minion-500 focus:ring-1 focus:ring-minion-500/30 font-mono uppercase placeholder-gray-600"
-                                    placeholder="PART NUMBER"
-                                    value={partNumberInput}
-                                    onChange={e => setPartNumberInput(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleAddManualPart()}
-                                />
-                                <input
-                                    className="w-11 bg-gray-900/70 border border-gray-800 rounded px-1 py-1 text-[11px] text-center text-gray-100 outline-none focus:border-minion-500 focus:ring-1 focus:ring-minion-500/30 font-mono placeholder-gray-600"
-                                    placeholder="QTY"
-                                    value={qtyInput}
-                                    onChange={e => setQtyInput(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleAddManualPart()}
-                                />
-                                <button
-                                    onClick={handleAddManualPart}
-                                    disabled={!partNumberInput.trim() || !qtyInput.trim()}
-                                    className="bg-minion-500 hover:bg-minion-400 disabled:opacity-30 p-1.5 text-black rounded-md transition-colors cursor-pointer flex items-center justify-center border border-minion-400/40"
-                                >
-                                    <Plus size={15} />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Clipboard parsing */}
-                    <div className="pt-2 border-t border-gray-850 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-gray-400">
-                            <span>CLIPBOARD PARSER</span>
-                            <Clipboard size={12} className="text-gray-500" />
-                        </div>
-                        <textarea
-                            className="w-full h-20 bg-gray-900 border border-gray-800 rounded p-2 text-[10px] font-mono focus:ring-1 focus:ring-minion-500 outline-none custom-scrollbar text-gray-300 placeholder-gray-600"
-                            placeholder="Paste parts catalog listing text lines..."
-                            value={ipcText}
-                            onChange={e => setIpcText(e.target.value)}
-                        />
-                        <button
-                            onClick={handleParseClipboard}
-                            disabled={!ipcText.trim()}
-                            className="w-full bg-gray-800 border border-gray-750 hover:bg-gray-750 text-gray-250 text-xs font-bold py-1.5 rounded transition-all disabled:opacity-30 cursor-pointer"
-                        >
-                            Parse Clipboard
-                        </button>
-
-                        {parsedItems.length > 0 && (
-                            <div className="bg-gray-950/80 p-2 border border-gray-850 rounded-lg space-y-2">
-                                <div className="text-[10px] text-minion-400 font-bold flex justify-between items-center">
-                                    <span>Parsed {parsedItems.length} lines:</span>
+                    {(!hideManualEntry || isAdmin) && (
+                        <div className={`pt-2 border-t border-gray-850 ${hideManualEntry ? 'opacity-50' : ''}`}>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold uppercase tracking-wide text-gray-400 select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={showManualEntry}
+                                        onChange={e => setShowManualEntry(e.target.checked)}
+                                        className="rounded border-gray-700 bg-gray-850 text-minion-500 focus:ring-minion-500 w-3 h-3"
+                                    />
+                                    <span>Manual Entry Row</span>
+                                </label>
+                                {isAdmin && (
                                     <button
-                                        onClick={handleImportParsedItems}
-                                        className="text-green-400 hover:text-green-300 font-bold cursor-pointer"
+                                        onClick={handleToggleHideManualEntry}
+                                        className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded border transition-colors cursor-pointer flex items-center gap-1 ${
+                                            hideManualEntry ? 'border-amber-500/50 bg-amber-950/40 text-amber-300' : 'border-gray-750 bg-gray-800 text-gray-400 hover:text-white'
+                                        }`}
+                                        title="Admin toggle: Hide or show Manual Entry section for non-admin users"
                                     >
-                                        Add Selected
+                                        {hideManualEntry ? '🙈 Hidden (Admin)' : '👁️ Hide for Users'}
+                                    </button>
+                                )}
+                            </div>
+
+                            {showManualEntry && (
+                                <div className="bg-gray-850/35 border border-gray-800/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
+                                    <input
+                                        className="min-w-0 flex-1 bg-gray-900/70 border border-gray-800 rounded px-2 py-1 text-[11px] text-gray-100 outline-none focus:border-minion-500 focus:ring-1 focus:ring-minion-500/30 font-mono uppercase placeholder-gray-600"
+                                        placeholder="PART NUMBER"
+                                        value={partNumberInput}
+                                        onChange={e => setPartNumberInput(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleAddManualPart()}
+                                    />
+                                    <input
+                                        className="w-11 bg-gray-900/70 border border-gray-800 rounded px-1 py-1 text-[11px] text-center text-gray-100 outline-none focus:border-minion-500 focus:ring-1 focus:ring-minion-500/30 font-mono placeholder-gray-600"
+                                        placeholder="QTY"
+                                        value={qtyInput}
+                                        onChange={e => setQtyInput(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleAddManualPart()}
+                                    />
+                                    <button
+                                        onClick={handleAddManualPart}
+                                        disabled={!partNumberInput.trim() || !qtyInput.trim()}
+                                        className="bg-minion-500 hover:bg-minion-400 disabled:opacity-30 p-1.5 text-black rounded-md transition-colors cursor-pointer flex items-center justify-center border border-minion-400/40"
+                                    >
+                                        <Plus size={15} />
                                     </button>
                                 </div>
-                                <div className="max-h-32 overflow-auto space-y-1 custom-scrollbar">
-                                    {parsedItems.map(item => (
-                                        <label
-                                            key={item.id}
-                                            className={`flex items-center gap-2 p-1 rounded text-[10px] bg-gray-900 border border-gray-850 ${!item.selected ? 'opacity-40' : ''}`}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={item.selected}
-                                                onChange={() => {
-                                                    setParsedItems(prev => prev.map(p => p.id === item.id ? { ...p, selected: !p.selected } : p))
-                                                }}
-                                                className="rounded border-gray-700 accent-minion-500"
-                                            />
-                                            <span className="font-mono text-yellow-305">{item.partNumber}</span>
-                                            <span className="text-gray-400 truncate flex-1">{item.nomenclature}</span>
-                                            <span className="font-mono text-gray-500">x{item.qty}</span>
-                                        </label>
-                                    ))}
+                            )}
+                        </div>
+                    )}
+
+                    {/* Clipboard parsing */}
+                    {(!hideClipboardParser || isAdmin) && (
+                        <div className={`pt-2 border-t border-gray-850 space-y-2 ${hideClipboardParser ? 'opacity-50' : ''}`}>
+                            <div className="flex items-center justify-between text-xs font-bold text-gray-400">
+                                <div className="flex items-center gap-1.5">
+                                    <span>CLIPBOARD PARSER</span>
+                                    <Clipboard size={12} className="text-gray-500" />
                                 </div>
+                                {isAdmin && (
+                                    <button
+                                        onClick={handleToggleHideClipboardParser}
+                                        className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded border transition-colors cursor-pointer flex items-center gap-1 ${
+                                            hideClipboardParser ? 'border-amber-500/50 bg-amber-950/40 text-amber-300' : 'border-gray-750 bg-gray-800 text-gray-400 hover:text-white'
+                                        }`}
+                                        title="Admin toggle: Hide or show Clipboard Parser section for non-admin users"
+                                    >
+                                        {hideClipboardParser ? '🙈 Hidden (Admin)' : '👁️ Hide for Users'}
+                                    </button>
+                                )}
                             </div>
-                        )}
-                    </div>
+                            <textarea
+                                className="w-full h-20 bg-gray-900 border border-gray-800 rounded p-2 text-[10px] font-mono focus:ring-1 focus:ring-minion-500 outline-none custom-scrollbar text-gray-300 placeholder-gray-600"
+                                placeholder="Paste parts catalog listing text lines..."
+                                value={ipcText}
+                                onChange={e => setIpcText(e.target.value)}
+                            />
+                            <button
+                                onClick={handleParseClipboard}
+                                disabled={!ipcText.trim()}
+                                className="w-full bg-gray-800 border border-gray-750 hover:bg-gray-750 text-gray-250 text-xs font-bold py-1.5 rounded transition-all disabled:opacity-30 cursor-pointer"
+                            >
+                                Parse Clipboard
+                            </button>
+
+                            {parsedItems.length > 0 && (
+                                <div className="bg-gray-950/80 p-2 border border-gray-850 rounded-lg space-y-2">
+                                    <div className="text-[10px] text-minion-400 font-bold flex justify-between items-center">
+                                        <span>Parsed {parsedItems.length} lines:</span>
+                                        <button
+                                            onClick={handleImportParsedItems}
+                                            className="text-green-400 hover:text-green-300 font-bold cursor-pointer"
+                                        >
+                                            Add Selected
+                                        </button>
+                                    </div>
+                                    <div className="max-h-32 overflow-auto space-y-1 custom-scrollbar">
+                                        {parsedItems.map(item => (
+                                            <label
+                                                key={item.id}
+                                                className={`flex items-center gap-2 p-1 rounded text-[10px] bg-gray-900 border border-gray-850 ${!item.selected ? 'opacity-40' : ''}`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={item.selected}
+                                                    onChange={() => {
+                                                        setParsedItems(prev => prev.map(p => p.id === item.id ? { ...p, selected: !p.selected } : p))
+                                                    }}
+                                                    className="rounded border-gray-700 accent-minion-500"
+                                                />
+                                                <span className="font-mono text-yellow-305">{item.partNumber}</span>
+                                                <span className="text-gray-400 truncate flex-1">{item.nomenclature}</span>
+                                                <span className="font-mono text-gray-500">x{item.qty}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Submit Action & Order Notes */}

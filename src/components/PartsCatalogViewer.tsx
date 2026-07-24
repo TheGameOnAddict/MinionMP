@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
     ChevronLeft, ChevronRight, ChevronUp, ZoomIn, ZoomOut,
     Square, Circle, Edit3, Type, Grid, Trash2, MousePointer,
-    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Printer, ChevronDown, FileText
+    RefreshCw, ArrowLeft, ShoppingCart, Settings, ListTree, Pin, BookOpen, Search, Lock, Unlock, Printer, ChevronDown
 } from 'lucide-react'
 import { db, PDFAnnotation, RequestLineItem } from '../utils/db'
 import DraftRequestDrawer from './DraftRequestDrawer'
@@ -605,7 +605,6 @@ export default function PartsCatalogViewer() {
     const [showAdminModal, setShowAdminModal] = useState(false)
     const [showLibraryModal, setShowLibraryModal] = useState(false)
     const [activeCatalogFolder, setActiveCatalogFolder] = useState<string>('PA-28 WARRIOR')
-    const [isHideClipboardParser, setIsHideClipboardParser] = useState<boolean>(false)
 
     // Multi-Page Print & Options State
     const [showPrintModal, setShowPrintModal] = useState(false)
@@ -3573,41 +3572,6 @@ export default function PartsCatalogViewer() {
                                 )}
                             </div>
                         </div>
-
-                        {/* Admin Clipboard & Text Parser Section */}
-                        {isAdmin && (
-                            <div className="bg-gray-900 border border-gray-800 p-3.5 rounded-xl mb-4 space-y-2.5">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-xs font-bold text-minion-400 uppercase tracking-wider flex items-center gap-1.5">
-                                        <FileText size={14} /> Clipboard Parser &amp; Text Tool
-                                    </h4>
-                                    <button
-                                        onClick={() => setIsHideClipboardParser(prev => !prev)}
-                                        className="px-2.5 py-1 bg-gray-800 hover:bg-gray-750 border border-gray-700 text-[10px] font-bold text-gray-300 rounded-lg cursor-pointer transition-colors"
-                                    >
-                                        {isHideClipboardParser ? '👁️ Show Clipboard Parser' : '👁️ Hide Clipboard Parser'}
-                                    </button>
-                                </div>
-
-                                {!isHideClipboardParser && (
-                                    <div className="space-y-2 pt-1 animate-fade-in">
-                                        <p className="text-[11px] text-gray-400">
-                                            Paste raw catalog index text from clipboard below to auto-generate index highlight boxes and part mappings.
-                                        </p>
-                                        <textarea
-                                            placeholder="Paste catalog text here (e.g. FIG 1-1, Part #, Nomenclature)..."
-                                            className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2.5 text-xs font-mono text-gray-200 h-20 outline-none focus:border-minion-500 custom-scrollbar"
-                                        />
-                                        <button
-                                            onClick={() => showToast('Clipboard text parsed successfully!')}
-                                            className="px-3 py-1.5 bg-minion-500 hover:bg-minion-400 text-black font-bold text-xs rounded-lg cursor-pointer transition-colors shadow-md"
-                                        >
-                                            Parse Clipboard Text
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
 
                         {/* Editing Section */}
                         {editingProfileId ? (
