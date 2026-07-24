@@ -1543,12 +1543,28 @@ export default function PartsCatalogViewer() {
                 const page = meta[`fig-${value.toLowerCase()}`]
                 if (page) targetPage = page
             } else if (type === 'pg') {
-                const rawNum = parseInt(value, 10)
-                if (!isNaN(rawNum) && rawNum > 0) {
-                    targetPage = rawNum
+                const cleanVal = (value || '').trim().toUpperCase()
+                // 1. First check metadata lookup (e.g. meta['pg-1A17'] -> PDF page number)
+                const pageFromMeta = meta[`pg-${cleanVal}`] || meta[`pg-${cleanVal.toLowerCase()}`]
+                if (pageFromMeta) {
+                    targetPage = pageFromMeta
                 } else {
-                    const page = meta[`pg-${value.toUpperCase()}`]
-                    if (page) targetPage = page
+                    // 2. Try matching any meta key containing cleanVal
+                    for (const [k, v] of Object.entries(meta)) {
+                        if (k.toLowerCase() === `pg-${cleanVal.toLowerCase()}` || k.toLowerCase().includes(`pg-${cleanVal.toLowerCase()}`)) {
+                            if (typeof v === 'number') {
+                                targetPage = v
+                                break
+                            }
+                        }
+                    }
+                    // 3. Fallback to exact pure numeric digit (e.g. "12" -> 12)
+                    if (targetPage <= 0 && /^\d+$/.test(cleanVal)) {
+                        const rawNum = Number(cleanVal)
+                        if (rawNum > 0 && rawNum <= totalPages) {
+                            targetPage = rawNum
+                        }
+                    }
                 }
             } else if (type === 'idx') {
                 pendingJumpTargetRef.current = { indexStr: value || group, partNumber }
