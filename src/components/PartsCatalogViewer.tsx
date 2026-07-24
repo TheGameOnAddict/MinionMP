@@ -2453,14 +2453,14 @@ export default function PartsCatalogViewer() {
                     className="flex items-center gap-2 px-3 py-1.5 bg-gray-950/80 hover:bg-gray-800 border border-gray-800 hover:border-amber-500/50 rounded-xl text-xs font-bold text-gray-200 transition-all cursor-pointer shadow-md group"
                     title="Click to switch Aircraft Folder & Catalog"
                 >
-                    <span className="font-mono text-[11px] text-amber-300 uppercase tracking-wider font-extrabold flex items-center gap-1">
+                    <span className="font-mono text-[11px] text-minion-400 uppercase tracking-wider font-extrabold flex items-center gap-1">
                         📁 {activeCatalogFolder}
                     </span>
                     <span className="text-gray-600 font-normal">/</span>
                     <span className="text-gray-100 font-bold truncate max-w-[220px] flex items-center gap-1">
-                        📖 {pdfName ? pdfName.replace(/\.pdf$/i, '') : 'Select Catalog'}
+                        {pdfName ? pdfName.replace(/\.pdf$/i, '') : 'Select Catalog'}
                     </span>
-                    <ChevronDown size={14} className="text-amber-400 group-hover:text-minion-400" />
+                    <ChevronDown size={14} className="text-minion-400 group-hover:text-minion-300" />
                 </button>
 
                 <div className="flex items-center gap-4">
@@ -2573,7 +2573,7 @@ export default function PartsCatalogViewer() {
                                 }`}
                                 title={isSidebarPinned ? "Sidebar is Pinned Open (Click to unpin)" : "Pin Sidebar Open"}
                             >
-                                <Pin size={13} className={`transition-all duration-300 ${isSidebarPinned ? 'fill-minion-400 text-minion-400 -rotate-45' : 'text-gray-400'}`} />
+                                <Pin size={13} className={isSidebarPinned ? "fill-minion-400 text-minion-400" : "text-gray-400"} />
                             </button>
                         </div>
 

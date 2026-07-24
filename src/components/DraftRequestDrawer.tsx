@@ -381,7 +381,7 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                             className={`p-1.5 rounded-lg border transition-all cursor-pointer ${isPinned ? 'bg-minion-500/20 text-minion-400 border-minion-500/40' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'}`}
                             title={isPinned ? "Unpin Drawer Panel" : "Pin Drawer Panel"}
                         >
-                            <Pin size={14} className={`transition-all duration-300 ${isPinned ? 'fill-minion-400 text-minion-400 -rotate-45' : 'text-gray-400'}`} />
+                            <Pin size={13} className={isPinned ? "fill-minion-400 text-minion-400" : "text-gray-400"} />
                         </button>
                         <button
                             onClick={onClose}
@@ -396,7 +396,7 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                 <div className="p-3.5 border-b border-gray-800 space-y-2 select-none bg-gray-950/40">
                     <div className="flex items-center justify-between">
                         <span className="text-[11px] font-black uppercase tracking-wider text-minion-400 flex items-center gap-1">
-                            <span>📋 Mechanic &amp; Aircraft Info</span>
+                            <span>Mechanic &amp; Aircraft Info</span>
                         </span>
                         {(mechanicName || tail || discrepancy) && (
                             <button
