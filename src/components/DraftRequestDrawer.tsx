@@ -378,10 +378,10 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                     <div className="flex items-center gap-1.5">
                         <button
                             onClick={handleTogglePin}
-                            className={`p-1 rounded transition-colors cursor-pointer ${isPinned ? 'bg-minion-500/20 text-minion-400' : 'text-gray-450 hover:bg-gray-800 hover:text-white'}`}
-                            title={isPinned ? "Unpin Panel" : "Pin Panel"}
+                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${isPinned ? 'bg-minion-500/20 text-minion-400 border-minion-500/40' : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'}`}
+                            title={isPinned ? "Unpin Drawer Panel" : "Pin Drawer Panel"}
                         >
-                            <Pin size={15} className={`transition-transform duration-300 ${isPinned ? '-rotate-45 text-minion-400' : ''}`} />
+                            <Pin size={14} className={`transition-all duration-300 ${isPinned ? 'fill-minion-400 text-minion-400 -rotate-45' : 'text-gray-400'}`} />
                         </button>
                         <button
                             onClick={onClose}
@@ -395,13 +395,13 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                 {/* Form Inputs */}
                 <div className="p-3.5 border-b border-gray-800 space-y-2 select-none bg-gray-950/40">
                     <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-minion-400 flex items-center gap-1">
                             <span>📋 Mechanic &amp; Aircraft Info</span>
                         </span>
                         {(mechanicName || tail || discrepancy) && (
                             <button
                                 onClick={handleClearMechanicInfo}
-                                className="text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                                className="text-[10px] font-bold text-minion-400 hover:text-minion-300 bg-minion-500/10 hover:bg-minion-500/20 border border-minion-500/30 px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 shadow-sm"
                                 title="Clear mechanic, tail number, and discrepancy for next user"
                             >
                                 <span>🧹 Clear Info</span>
@@ -410,10 +410,10 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                     </div>
 
                     <div>
-                        <label className="block text-[10px] font-bold uppercase text-amber-400/80 mb-0.5">Mechanic Name</label>
+                        <label className="block text-[10px] font-bold uppercase text-minion-400/80 mb-0.5">Mechanic Name</label>
                         <input
                             ref={mechanicInputRef}
-                            className="w-full bg-gray-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 outline-none placeholder-gray-600 transition-colors"
+                            className="w-full bg-gray-900 border border-minion-500/30 rounded-lg px-3 py-1.5 text-xs text-minion-300 font-bold focus:border-minion-500 focus:ring-1 focus:ring-minion-500/40 outline-none placeholder-gray-600 transition-colors"
                             placeholder="e.g. John Doe"
                             value={mechanicName}
                             onChange={e => setMechanicName(e.target.value)}
@@ -422,9 +422,9 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
 
                     <div className="flex gap-2">
                         <div className="flex-1">
-                            <label className="block text-[10px] font-bold uppercase text-amber-400/80 mb-0.5">Tail Number</label>
+                            <label className="block text-[10px] font-bold uppercase text-minion-400/80 mb-0.5">Tail Number</label>
                             <input
-                                className="w-full bg-gray-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 outline-none uppercase font-mono placeholder-gray-600 transition-colors"
+                                className="w-full bg-gray-900 border border-minion-500/30 rounded-lg px-3 py-1.5 text-xs text-minion-300 font-bold focus:border-minion-500 focus:ring-1 focus:ring-minion-500/40 outline-none uppercase font-mono placeholder-gray-600 transition-colors"
                                 placeholder="N12345"
                                 value={tail}
                                 onChange={e => setTail(e.target.value)}
@@ -432,9 +432,9 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                             />
                         </div>
                         <div className="w-28">
-                            <label className="block text-[10px] font-bold uppercase text-amber-400/80 mb-0.5">Discrepancy #</label>
+                            <label className="block text-[10px] font-bold uppercase text-minion-400/80 mb-0.5">Discrepancy #</label>
                             <input
-                                className="w-full bg-gray-900 border border-amber-500/30 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-400 focus:ring-1 focus:ring-amber-400/40 outline-none font-mono placeholder-gray-600 transition-colors"
+                                className="w-full bg-gray-900 border border-minion-500/30 rounded-lg px-3 py-1.5 text-xs text-minion-300 font-bold focus:border-minion-500 focus:ring-1 focus:ring-minion-500/40 outline-none font-mono placeholder-gray-600 transition-colors"
                                 placeholder="101"
                                 value={discrepancy}
                                 onChange={e => setDiscrepancy(e.target.value)}
@@ -572,7 +572,7 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                                     <button
                                         onClick={handleToggleHideManualEntry}
                                         className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded border transition-colors cursor-pointer flex items-center gap-1 ${
-                                            hideManualEntry ? 'border-amber-500/50 bg-amber-950/40 text-amber-300' : 'border-gray-750 bg-gray-800 text-gray-400 hover:text-white'
+                                            hideManualEntry ? 'border-minion-500/50 bg-minion-500/10 text-minion-400' : 'border-gray-750 bg-gray-800 text-gray-400 hover:text-white'
                                         }`}
                                         title="Admin toggle: Hide or show Manual Entry section for non-admin users"
                                     >
@@ -621,7 +621,7 @@ export default function DraftRequestDrawer({ isOpen, onClose }: DraftRequestDraw
                                     <button
                                         onClick={handleToggleHideClipboardParser}
                                         className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded border transition-colors cursor-pointer flex items-center gap-1 ${
-                                            hideClipboardParser ? 'border-amber-500/50 bg-amber-950/40 text-amber-300' : 'border-gray-750 bg-gray-800 text-gray-400 hover:text-white'
+                                            hideClipboardParser ? 'border-minion-500/50 bg-minion-500/10 text-minion-400' : 'border-gray-750 bg-gray-800 text-gray-400 hover:text-white'
                                         }`}
                                         title="Admin toggle: Hide or show Clipboard Parser section for non-admin users"
                                     >

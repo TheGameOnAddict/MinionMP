@@ -2568,12 +2568,12 @@ export default function PartsCatalogViewer() {
                                 }}
                                 className={`p-1.5 rounded-lg border transition-all cursor-pointer ml-1 ${
                                     isSidebarPinned
-                                        ? 'bg-amber-400/20 border-amber-400/50 text-amber-300 font-bold'
-                                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300'
+                                        ? 'bg-minion-500/20 border-minion-500/40 text-minion-400 font-bold'
+                                        : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'
                                 }`}
                                 title={isSidebarPinned ? "Sidebar is Pinned Open (Click to unpin)" : "Pin Sidebar Open"}
                             >
-                                <Pin size={12} className={isSidebarPinned ? "fill-amber-400 text-amber-400" : ""} />
+                                <Pin size={13} className={`transition-all duration-300 ${isSidebarPinned ? 'fill-minion-400 text-minion-400 -rotate-45' : 'text-gray-400'}`} />
                             </button>
                         </div>
 
@@ -2810,12 +2810,12 @@ export default function PartsCatalogViewer() {
                                 onClick={() => { setTool('index'); selectIndexBlock(0); setShowDrawDropdown(false) }}
                                 className={`px-3 py-1 text-xs rounded-lg font-black cursor-pointer transition-all flex items-center gap-1.5 shadow-md ${
                                     tool === 'index'
-                                        ? 'bg-amber-400 text-black ring-2 ring-amber-400/50 scale-105'
-                                        : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40'
+                                        ? 'bg-minion-500 text-black ring-2 ring-minion-500/50 scale-105'
+                                        : 'bg-minion-500/20 text-minion-400 hover:bg-minion-500/30 border border-minion-500/40'
                                 }`}
                                 title="Index Mode — Recommended method for picking & pinning catalog parts"
                             >
-                                <ListTree size={14} className="text-amber-400 fill-amber-400/30" />
+                                <ListTree size={14} className={tool === 'index' ? 'text-black fill-black/30' : 'text-minion-400 fill-minion-400/30'} />
                                 <span>📌 Index Mode (Recommended)</span>
                             </button>
 
@@ -3358,7 +3358,7 @@ export default function PartsCatalogViewer() {
                     )}
                 </div>
                     {tool === 'index' && (
-                        <div className={`fixed left-4 bottom-4 z-30 rounded-2xl border-2 border-amber-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
+                        <div className={`fixed left-4 bottom-4 z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in transition-all duration-300 ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'}`}>
                             {/* Header */}
                             <div className="flex items-center justify-between gap-3 border-b border-gray-800 bg-gray-950/80 px-4 py-2.5">
                                 <div className="min-w-0 flex items-center gap-3">
@@ -3399,12 +3399,12 @@ export default function PartsCatalogViewer() {
                                             onClick={() => togglePinIndex(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label)}
                                             className={`px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md ${
                                                 (pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label)
-                                                    ? 'bg-amber-400 border-amber-500 text-black font-black ring-2 ring-amber-400/40'
-                                                    : 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
+                                                    ? 'bg-minion-500 border-minion-400 text-black font-black ring-2 ring-minion-500/40'
+                                                    : 'bg-minion-500/20 border-minion-500/50 text-minion-300 hover:bg-minion-500/30'
                                             }`}
                                             title={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "Unpin figure highlight overlay (Ctrl + Space)" : "Pin figure highlight overlay (Ctrl + Space)"}
                                         >
-                                            <Pin size={13} className={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "fill-black text-black" : "text-amber-400"} />
+                                            <Pin size={13} className={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "fill-black text-black" : "text-minion-400"} />
                                             <span>{(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? 'PINNED' : 'PIN FIGURE (Ctrl+Space)'}</span>
                                         </button>
                                     )}
@@ -3434,11 +3434,11 @@ export default function PartsCatalogViewer() {
                             {/* Keyboard Shortcuts Hint Bar */}
                             <div className="bg-gray-950 px-4 py-1.5 border-b border-gray-800 flex items-center justify-between text-[11px] font-mono text-gray-400">
                                 <div className="flex items-center gap-3 overflow-x-auto">
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">↑ / ↓</kbd> Move Index</span>
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Shift + ↑ / ↓</kbd> Navigate Lines</span>
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Space</kbd> Check Item</span>
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Ctrl + Space</kbd> Pin Figure</span>
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Ctrl + Enter</kbd> Add to Cart</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">↑ / ↓</kbd> Move Index</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Shift + ↑ / ↓</kbd> Navigate Lines</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Space</kbd> Check Item</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Ctrl + Space</kbd> Pin Figure</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-minion-400 px-1.5 py-0.5 rounded border border-gray-700">Ctrl + Enter</kbd> Add to Cart</span>
                                     <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-red-300 px-1.5 py-0.5 rounded border border-gray-700">Esc</kbd> Exit</span>
                                 </div>
                             </div>

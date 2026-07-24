@@ -182,7 +182,7 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
 
                 {/* Assigned Folder Badge */}
                 <div className="pt-0.5 flex items-center justify-center">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold font-mono text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold font-mono text-minion-300 bg-minion-500/10 border border-minion-500/30 px-2 py-0.5 rounded-md">
                         <Folder size={10} /> {catalog.folder_name || 'GENERAL & ENGINES'}
                     </span>
                 </div>
@@ -191,7 +191,7 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
                 {isAdmin && (
                     <div className="w-full mt-2 pt-2 border-t border-gray-800 flex items-center justify-between gap-1 text-[11px]" onClick={e => e.stopPropagation()}>
                         <span className="text-gray-400 font-bold text-[10px] flex items-center gap-1 shrink-0">
-                            <Folder size={11} className="text-amber-400" /> Move to:
+                            <Folder size={11} className="text-minion-400" /> Move to:
                         </span>
                         <select
                             value={catalog.folder_id || 'folder_general'}
@@ -201,7 +201,7 @@ function CatalogCard({ catalog, folders, isActive, isAdmin, onSelect, onDelete, 
                                     onMoveToFolder(selectedF.id, selectedF.name)
                                 }
                             }}
-                            className="bg-gray-900 border border-gray-700 hover:border-amber-400 text-gray-200 text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer font-mono shrink-0 max-w-[150px] truncate"
+                            className="bg-gray-900 border border-gray-700 hover:border-minion-500 text-gray-200 text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer font-mono shrink-0 max-w-[150px] truncate"
                         >
                             {folders.map(f => (
                                 <option key={f.id} value={f.id}>
@@ -379,7 +379,7 @@ export default function CatalogLibraryModal({
                                     setCatalogs(merged)
                                     alert('Catalog library cleaned and deduplicated!')
                                 }}
-                                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 border border-amber-500/30 hover:border-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                className="text-[11px] font-bold text-minion-400 hover:text-minion-300 border border-minion-500/30 hover:border-minion-500 bg-minion-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                                 title="Purge duplicate catalog entries"
                             >
                                 <RefreshCw size={12} /> Clean Duplicates
@@ -404,7 +404,7 @@ export default function CatalogLibraryModal({
 
                 {/* Folder Carousel Bar & Drag Target */}
                 <div className="px-6 py-3 bg-gray-950/40 border-b border-gray-800 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
-                    <div className="text-[10px] text-amber-300/90 font-mono font-bold flex items-center gap-1 mr-1 shrink-0 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">
+                    <div className="text-[10px] text-minion-300/90 font-mono font-bold flex items-center gap-1 mr-1 shrink-0 bg-minion-500/10 border border-minion-500/20 px-2 py-1 rounded-lg">
                         💡 Drag cards onto tabs to organize!
                     </div>
 
@@ -422,7 +422,7 @@ export default function CatalogLibraryModal({
                         }}
                         className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
                             dragOverFolderId === 'all'
-                                ? 'bg-amber-300 text-black font-black ring-4 ring-amber-400/60 scale-105 shadow-xl'
+                                ? 'bg-minion-400 text-black font-black ring-4 ring-minion-500/60 scale-105 shadow-xl'
                                 : selectedFolderId === 'all'
                                 ? 'bg-minion-500 text-black font-black shadow-md'
                                 : 'bg-gray-850 text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-750'
@@ -458,9 +458,9 @@ export default function CatalogLibraryModal({
                                     onClick={() => setSelectedFolderId(folder.id)}
                                     className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                         isHovered
-                                            ? 'bg-amber-300 text-black font-black ring-4 ring-amber-400/60 scale-105 shadow-xl'
+                                            ? 'bg-minion-400 text-black font-black ring-4 ring-minion-500/60 scale-105 shadow-xl'
                                             : selectedFolderId === folder.id
-                                            ? 'bg-amber-400 text-black font-black shadow-md'
+                                            ? 'bg-minion-500 text-black font-black shadow-md'
                                             : 'bg-gray-850 text-gray-300 hover:text-white hover:bg-gray-800 border border-gray-750'
                                     }`}
                                 >
@@ -494,11 +494,11 @@ export default function CatalogLibraryModal({
                                     placeholder="FOLDER NAME..."
                                     value={newFolderName}
                                     onChange={e => setNewFolderName(e.target.value)}
-                                    className="bg-gray-900 border border-amber-500 text-gray-100 text-xs px-2.5 py-1 rounded-lg outline-none font-mono uppercase"
+                                    className="bg-gray-900 border border-minion-500 text-gray-100 text-xs px-2.5 py-1 rounded-lg outline-none font-mono uppercase"
                                 />
                                 <button
                                     onClick={handleCreateFolder}
-                                    className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-black font-bold rounded-lg text-xs cursor-pointer"
+                                    className="px-2.5 py-1 bg-minion-500 hover:bg-minion-400 text-black font-bold rounded-lg text-xs cursor-pointer"
                                 >
                                     Add
                                 </button>
@@ -512,7 +512,7 @@ export default function CatalogLibraryModal({
                         ) : (
                             <button
                                 onClick={() => setShowNewFolderInput(true)}
-                                className="flex items-center gap-1 px-3 py-1.5 border border-dashed border-gray-700 hover:border-amber-400 text-gray-400 hover:text-amber-400 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
+                                className="flex items-center gap-1 px-3 py-1.5 border border-dashed border-gray-700 hover:border-minion-500 text-gray-400 hover:text-minion-400 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
                             >
                                 <Plus size={14} />
                                 <span>New Folder</span>
