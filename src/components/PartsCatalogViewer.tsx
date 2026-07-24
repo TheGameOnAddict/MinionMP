@@ -896,6 +896,8 @@ export default function PartsCatalogViewer() {
     const scrollEndTimeoutRef = useRef<any>(null)
     const lastScrollSyncedPageRef = useRef<number>(1)
 
+    const [showDrawDropdown, setShowDrawDropdown] = useState<boolean>(false)
+
     // Resizable figure preview width (persisted in localStorage)
     const [figPreviewWidth, setFigPreviewWidth] = useState<number>(() => {
         return Number(localStorage.getItem('minion_fig_preview_width') || '110')
@@ -1100,7 +1102,7 @@ export default function PartsCatalogViewer() {
         localStorage.setItem('minion_current_page_number', String(pageNumber))
     }, [pageNumber])
 
-    // --- INDEX MODE KEYBOARD NAVIGATION (Arrows, Shift+Arrows, Space, Escape) ---
+    // --- INDEX MODE KEYBOARD NAVIGATION (Arrows, Shift+Arrows, Space, Ctrl+Space, Ctrl+Enter, Escape) ---
     useEffect(() => {
         if (tool !== 'index') return
 
@@ -1113,6 +1115,19 @@ export default function PartsCatalogViewer() {
             if (e.key === 'Escape') {
                 e.preventDefault()
                 setTool('select')
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === ' ' || e.code === 'Space')) {
+                // Ctrl + Space: Pin / Unpin active figure index block
+                e.preventDefault()
+                const currentLabel = indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label
+                if (currentLabel) {
+                    togglePinIndex(currentLabel)
+                }
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                // Ctrl + Enter: Add selected items to draft cart
+                e.preventDefault()
+                if (stagedItems.some(i => i.selected)) {
+                    importStagedItemsToDraft()
+                }
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault()
                 if (e.shiftKey) {
@@ -1134,19 +1149,11 @@ export default function PartsCatalogViewer() {
                     selectIndexBlock(activeIndex - 1)
                 }
             } else if (e.key === ' ' || e.code === 'Space') {
+                // Space (or Shift + Space): Toggle checkbox of focused subpart row
                 e.preventDefault()
-                if (e.shiftKey || (focusedSubpartIdx >= 0 && focusedSubpartIdx < stagedItems.length)) {
-                    // Shift + Space (or Space when focused on subpart row): Toggle checkbox
-                    const target = stagedItems[focusedSubpartIdx]
-                    if (target) {
-                        toggleStagedItemSelection(target.id, target.partNumber, !target.selected)
-                    }
-                } else {
-                    // Space: Pin / Unpin active figure index block
-                    const currentLabel = indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label
-                    if (currentLabel) {
-                        togglePinIndex(currentLabel)
-                    }
+                const target = stagedItems[focusedSubpartIdx]
+                if (target) {
+                    toggleStagedItemSelection(target.id, target.partNumber, !target.selected)
                 }
             }
         }
@@ -2772,59 +2779,88 @@ export default function PartsCatalogViewer() {
                             </button>
                         </div>
 
-                        {/* Compact Drawing Tools Bar */}
-                        <div className="flex items-center gap-1 bg-gray-950/60 p-1 rounded-xl border border-gray-800 shadow-inner">
+                        {/* Primary Mode Toolbar */}
+                        <div className="flex items-center gap-1.5 bg-gray-950/60 p-1 rounded-xl border border-gray-800 shadow-inner relative">
+                            {/* Select Tool */}
                             <button
-                                onClick={() => setTool('select')}
-                                className={`px-2.5 py-1 text-xs rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-1 ${tool === 'select' ? 'bg-minion-500 text-black font-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                                onClick={() => { setTool('select'); setShowDrawDropdown(false) }}
+                                className={`px-2.5 py-1 text-xs rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${tool === 'select' ? 'bg-minion-500 text-black font-black shadow-md' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                                 title="Select / Pointer Mode"
                             >
                                 <MousePointer size={13} /> Select
                             </button>
+
+                            {/* Primary Prominent Index Mode Button (Recommended) */}
                             <button
-                                onClick={() => setTool('rect')}
-                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'rect' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Rectangle Box Tool"
+                                onClick={() => { setTool('index'); selectIndexBlock(0); setShowDrawDropdown(false) }}
+                                className={`px-3 py-1 text-xs rounded-lg font-black cursor-pointer transition-all flex items-center gap-1.5 shadow-md ${
+                                    tool === 'index'
+                                        ? 'bg-amber-400 text-black ring-2 ring-amber-400/50 scale-105'
+                                        : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40'
+                                }`}
+                                title="Index Mode — Recommended method for picking & pinning catalog parts"
                             >
-                                <Square size={14} />
+                                <ListTree size={14} className="text-amber-400 fill-amber-400/30" />
+                                <span>📌 Index Mode (Recommended)</span>
                             </button>
+
+                            {/* Collapsible Draw Tools Dropdown */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowDrawDropdown(prev => !prev)}
+                                    className={`px-2.5 py-1 text-xs rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-1.5 border ${
+                                        ['pen', 'rect', 'circle', 'text', 'part_box'].includes(tool)
+                                            ? 'bg-minion-500 text-black border-minion-400 font-black shadow-md'
+                                            : 'bg-gray-900 text-gray-300 border-gray-700 hover:bg-gray-800 hover:text-white'
+                                    }`}
+                                    title="Drawing, Shapes, Annotations & Part Boxes"
+                                >
+                                    <Edit3 size={13} />
+                                    <span>Draw Tools</span>
+                                    <ChevronDown size={12} className={`transition-transform ${showDrawDropdown ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {showDrawDropdown && (
+                                    <div className="absolute top-full left-0 mt-1 w-44 bg-gray-900 border border-gray-750 rounded-xl shadow-2xl p-1.5 z-40 animate-fade-in flex flex-col gap-1 text-xs">
+                                        <button
+                                            onClick={() => { setTool('pen'); setShowDrawDropdown(false) }}
+                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-medium text-left cursor-pointer transition-colors ${tool === 'pen' ? 'bg-minion-500 text-black font-bold' : 'text-gray-200 hover:bg-gray-800'}`}
+                                        >
+                                            <Edit3 size={14} /> Freehand Pen
+                                        </button>
+                                        <button
+                                            onClick={() => { setTool('rect'); setShowDrawDropdown(false) }}
+                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-medium text-left cursor-pointer transition-colors ${tool === 'rect' ? 'bg-minion-500 text-black font-bold' : 'text-gray-200 hover:bg-gray-800'}`}
+                                        >
+                                            <Square size={14} /> Rectangle Box
+                                        </button>
+                                        <button
+                                            onClick={() => { setTool('circle'); setShowDrawDropdown(false) }}
+                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-medium text-left cursor-pointer transition-colors ${tool === 'circle' ? 'bg-minion-500 text-black font-bold' : 'text-gray-200 hover:bg-gray-800'}`}
+                                        >
+                                            <Circle size={14} /> Circle Shape
+                                        </button>
+                                        <button
+                                            onClick={() => { setTool('text'); setShowDrawDropdown(false) }}
+                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-medium text-left cursor-pointer transition-colors ${tool === 'text' ? 'bg-minion-500 text-black font-bold' : 'text-gray-200 hover:bg-gray-800'}`}
+                                        >
+                                            <Type size={14} /> Sticky Note
+                                        </button>
+                                        <div className="h-px bg-gray-800 my-0.5" />
+                                        <button
+                                            onClick={() => { setTool('part_box'); setShowDrawDropdown(false) }}
+                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-bold text-left cursor-pointer transition-colors ${tool === 'part_box' ? 'bg-minion-500 text-black' : 'text-amber-400 hover:bg-gray-800'}`}
+                                        >
+                                            <Grid size={14} /> + Custom Part Box
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Eraser Tool */}
                             <button
-                                onClick={() => setTool('circle')}
-                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'circle' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Circle Tool"
-                            >
-                                <Circle size={14} />
-                            </button>
-                            <button
-                                onClick={() => setTool('pen')}
-                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'pen' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Pen Tool (Freehand Draw)"
-                            >
-                                <Edit3 size={14} />
-                            </button>
-                            <button
-                                onClick={() => setTool('text')}
-                                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'text' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Sticky Note Tool"
-                            >
-                                <Type size={14} />
-                            </button>
-                            <button
-                                onClick={() => setTool('part_box')}
-                                className={`px-2 py-1 text-xs rounded-lg font-bold cursor-pointer transition-colors ${tool === 'part_box' ? 'bg-minion-500 text-black' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                                title="Define Requested Part Bounding Box"
-                            >
-                                + Part Box
-                            </button>
-                            <button
-                                onClick={() => { setTool('index'); selectIndexBlock(0) }}
-                                className={`px-2.5 py-1 text-xs rounded-lg font-black cursor-pointer transition-colors ${tool === 'index' ? 'bg-amber-400 text-black shadow-md ring-2 ring-amber-400/40' : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-gray-700'}`}
-                                title="Index Mode & Highlight Navigation"
-                            >
-                                <span className="inline-flex items-center gap-1.5"><ListTree size={14} /> Index Mode</span>
-                            </button>
-                            <button
-                                onClick={() => setTool('eraser')}
+                                onClick={() => { setTool('eraser'); setShowDrawDropdown(false) }}
                                 className={`p-1.5 rounded-lg cursor-pointer transition-colors ${tool === 'eraser' ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-850 hover:text-red-400'}`}
                                 title="Eraser (Delete shapes/notes)"
                             >
@@ -3350,19 +3386,21 @@ export default function PartsCatalogViewer() {
                                                     ? 'bg-amber-400 border-amber-500 text-black font-black ring-2 ring-amber-400/40'
                                                     : 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
                                             }`}
-                                            title={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "Unpin figure highlight overlay (Space key)" : "Pin figure highlight overlay (Space key)"}
+                                            title={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "Unpin figure highlight overlay (Ctrl + Space)" : "Pin figure highlight overlay (Ctrl + Space)"}
                                         >
                                             <Pin size={13} className={(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? "fill-black text-black" : "text-amber-400"} />
-                                            <span>{(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? 'PINNED' : 'PIN FIGURE'}</span>
+                                            <span>{(pinnedIndices[pageNumber] || []).includes(indexItems[activeIndex]?.label || indexBlocks[activeIndex]?.label) ? 'PINNED' : 'PIN FIGURE (Ctrl+Space)'}</span>
                                         </button>
                                     )}
 
                                     <button
                                         onClick={importStagedItemsToDraft}
                                         disabled={stagedItems.filter(i => i.selected).length === 0}
-                                        className="rounded-xl bg-minion-500 px-3.5 py-1.5 text-xs font-black text-black hover:bg-minion-400 disabled:opacity-40 transition-colors cursor-pointer shadow-md"
+                                        className="rounded-xl bg-minion-500 px-3.5 py-1.5 text-xs font-black text-black hover:bg-minion-400 disabled:opacity-40 transition-colors cursor-pointer shadow-md flex items-center gap-1"
+                                        title="Add selected parts to Draft Request Cart (Ctrl + Enter)"
                                     >
-                                        Add Selected to Draft
+                                        <span>Add to Draft Cart</span>
+                                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 bg-black/20 text-black rounded text-[9.5px] font-mono font-bold">Ctrl+Enter</kbd>
                                     </button>
 
                                     {/* Prominent Exit Index Mode Button */}
@@ -3381,8 +3419,10 @@ export default function PartsCatalogViewer() {
                             <div className="bg-gray-950 px-4 py-1.5 border-b border-gray-800 flex items-center justify-between text-[11px] font-mono text-gray-400">
                                 <div className="flex items-center gap-3 overflow-x-auto">
                                     <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">↑ / ↓</kbd> Move Index</span>
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Shift + ↑ / ↓</kbd> Move Lines</span>
-                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Space</kbd> Pin / Check Item</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Shift + ↑ / ↓</kbd> Navigate Lines</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Space</kbd> Check Item</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Ctrl + Space</kbd> Pin Figure</span>
+                                    <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-amber-300 px-1.5 py-0.5 rounded border border-gray-700">Ctrl + Enter</kbd> Add to Cart</span>
                                     <span className="flex items-center gap-1"><kbd className="bg-gray-800 text-red-300 px-1.5 py-0.5 rounded border border-gray-700">Esc</kbd> Exit</span>
                                 </div>
                             </div>
