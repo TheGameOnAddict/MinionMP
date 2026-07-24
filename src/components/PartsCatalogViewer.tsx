@@ -614,19 +614,21 @@ export default function PartsCatalogViewer() {
 
     const toggleDockPosition = (targetPos?: 'top' | 'bottom') => {
         const nextPos = targetPos || (indexEditorPosition === 'bottom' ? 'top' : 'bottom')
-        if (nextPos === indexEditorPosition) return
+        if (nextPos === indexEditorPosition || dockAnimState !== 'idle') return
 
-        // Step 1: Slide out right
+        // Step 1: Slide out to right offscreen (280ms)
         setDockAnimState('sliding-out')
 
-        // Step 2: Swap position to top/bottom & prepare slide-in from left
         setTimeout(() => {
+            // Step 2: Swap position to top/bottom & slide in from left offscreen (320ms)
             setIndexEditorPosition(nextPos)
             setDockAnimState('sliding-in')
+
             setTimeout(() => {
+                // Step 3: Complete animation, back to idle
                 setDockAnimState('idle')
-            }, 30)
-        }, 180)
+            }, 320)
+        }, 280)
     }
 
     // Multi-Page Print & Options State
@@ -3390,12 +3392,12 @@ export default function PartsCatalogViewer() {
                     {tool === 'index' && (
                         isIndexEditorMinimized ? (
                             <div
-                                className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 animate-fade-in backdrop-blur-md select-none ${
+                                className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900/95 shadow-2xl px-4 py-2 flex items-center justify-between gap-4 backdrop-blur-md select-none ${
                                     dockAnimState === 'sliding-out'
-                                        ? 'translate-x-full opacity-0 pointer-events-none transition-all duration-200 ease-in'
+                                        ? 'animate-dock-out-right'
                                         : dockAnimState === 'sliding-in'
-                                        ? '-translate-x-12 opacity-0 transition-none'
-                                        : 'translate-x-0 opacity-100 transition-all duration-300 ease-out'
+                                        ? 'animate-dock-in-left'
+                                        : 'transition-all duration-300 ease-in-out'
                                 }`}
                             >
                                 <div className="flex items-center gap-3 text-xs font-bold text-gray-200 font-mono">
@@ -3434,12 +3436,12 @@ export default function PartsCatalogViewer() {
                             </div>
                         ) : (
                             <div
-                                className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden animate-fade-in ${
+                                className={`fixed ${indexEditorPosition === 'top' ? 'top-16' : 'bottom-4'} ${showOutlineSidebar ? 'left-[272px]' : 'left-4'} ${isDrawerOpen && isDrawerPinned ? 'right-[376px]' : 'right-4'} z-30 rounded-2xl border-2 border-minion-500/40 bg-gray-900 shadow-2xl overflow-hidden ${
                                     dockAnimState === 'sliding-out'
-                                        ? 'translate-x-full opacity-0 pointer-events-none transition-all duration-200 ease-in'
+                                        ? 'animate-dock-out-right'
                                         : dockAnimState === 'sliding-in'
-                                        ? '-translate-x-12 opacity-0 transition-none'
-                                        : 'translate-x-0 opacity-100 transition-all duration-300 ease-out'
+                                        ? 'animate-dock-in-left'
+                                        : 'transition-all duration-300 ease-in-out'
                                 }`}
                             >
                                 {/* Header */}
